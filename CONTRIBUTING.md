@@ -1,8 +1,8 @@
-# Разработка и адаптация
+# Contributing and adapting Brighty
 
-Спасибо за вклад в Brighty. Проект состоит из небольших Python CLI и не требует сборки или pip-пакетов. Перед изменениями прочитайте [README](README.md), [архитектуру](ARCHITECTURE.md) и [AGENTS.md](AGENTS.md).
+Thanks for contributing. Brighty consists of small Python CLIs and requires no build or pip packages. Read the [README](README.md), [architecture](ARCHITECTURE.md), and [AGENTS.md](AGENTS.md) before making changes.
 
-## Checkout и проверки
+## Checkout and checks
 
 ```sh
 git clone git@github.com:username31217/brighty.git
@@ -10,29 +10,29 @@ cd brighty
 python3 -m unittest discover -v
 ```
 
-Требуется Python 3.10+. На Linux можно разрабатывать чистую логику и запускать mock-тесты. Реальные команды дисплеев требуют Apple Silicon macOS и зависимостей из README. Не вызывайте CLI off/on/toggle в CI.
+Python 3.10+ is required. Linux is suitable for developing pure logic and running mock tests. Real display commands require Apple Silicon macOS and the dependencies listed in the README. Never invoke display-changing CLI commands in CI.
 
-## Адаптация к своей машине
+## Adapt to your machine
 
-1. Установите Homebrew-зависимости из README и проверьте `brighty.py list`.
-2. При включённом мониторе создайте своё состояние через `save-layout`, при необходимости с `--id`.
-3. Проверьте m1ddc по UUID и его get/max luminance. Не считайте, что максимум всегда 100.
-4. При нестандартном Homebrew исправьте `DDC` в brightness.py и пути в «Командах».
-5. Создайте свои горячие клавиши; системная библиотека «Команд» не переносится через Git.
-6. Проверяйте оборудование с открытой крышкой, доступным Terminal и возможностью выполнить `on`.
+1. Install the Homebrew dependencies and check `brighty.py list`.
+2. With the monitor enabled, create your own state using `save-layout`, with `--id` if necessary.
+3. Check m1ddc using the UUID and get/max luminance. Do not assume the maximum is always 100.
+4. For nonstandard Homebrew locations, update `DDC` in brightness.py and the paths in Shortcuts.
+5. Create your own keyboard shortcuts; the system Shortcuts library is not transferred through Git.
+6. Test hardware with the lid open, Terminal accessible, and a way to run `on`.
 
-Не коммитьте личные UUID, системные ID, серийные номера, локальные пути, состояние дисплеев и выгрузки системных настроек. В тестах используйте синтетические значения, как `internal` и `lg`. Нельзя переносить рабочее состояние с чужого Mac.
+Do not commit personal UUIDs, system IDs, serial numbers, local paths, display state, or system-settings exports. Use synthetic values such as `internal` and `lg` in tests. Never copy another Mac's runtime state.
 
-## Изменения кода
+## Code changes
 
-- Сохраняйте разделение контроллера, macOS API и DDC-адаптера.
-- Для нового поведения добавляйте тесты результата и отказов, а не копии реализации.
-- Изменения транзакций, сроков действия CoreGraphics и приватных API требуют отдельного обоснования и проверки на реальном оборудовании. Успешный код API не заменяет повторного чтения состояния.
-- Поддержку нескольких внешних экранов и Intel вводите явно: сейчас это не заявленные возможности яркости.
-- Обновляйте README при изменении CLI, ARCHITECTURE при изменении устройства, CHANGELOG при изменении поведения.
-- Используйте Python standard library, пока новая зависимость не решает конкретную задачу. Runtime и dev-зависимости должны быть документированы.
+- Preserve the separation between the controller, macOS API, and DDC adapter.
+- Test new behavior and failure outcomes instead of mirroring implementation details.
+- Changes to transactions, CoreGraphics scope, and private APIs need a separate rationale and hardware validation. An API success code does not replace a fresh state read.
+- Introduce multiple-external-display and Intel support explicitly; neither is currently claimed for brightness control.
+- Update README for CLI changes, ARCHITECTURE for implementation changes, and CHANGELOG for behavior changes.
+- Prefer the Python standard library unless a dependency solves a concrete problem. Document runtime and development dependencies.
 
-## Перед коммитом / pull request
+## Before a commit or pull request
 
 ```sh
 python3 -m unittest discover -v
@@ -40,6 +40,8 @@ git diff --check
 git status --short
 ```
 
-Опишите проблему, итоговое поведение, тесты и границы аппаратной проверки. Различайте mock-проверку, чтение состояния ОС и визуальное подтверждение изображения пользователем. Для аппаратного прогона запишите модель Mac/монитора, подключение, macOS и версии утилит без уникальных идентификаторов.
+Describe the problem, resulting behavior, tests, and limits of hardware validation. Distinguish mock tests, OS state reads, and the user's visual confirmation. For hardware runs, record the Mac/monitor models, connection, macOS version, and utility versions without unique identifiers.
 
-Известный пробел: автоматическая синхронизация после возврата LG проверена unit-тестами, но отдельный физический цикл нового пути ещё не подтверждён. Не выдавайте этот сценарий за проверенный на оборудовании без нового результата.
+Known gap: automatic brightness synchronization after LG returns has unit coverage, but a separate physical cycle of the new path has not yet been confirmed. Do not claim hardware validation without new evidence.
+
+All tracked documentation, source comments, CLI output, and tests must be in English.

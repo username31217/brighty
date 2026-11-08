@@ -1,12 +1,13 @@
-## Что изменилось
+## Changes
 
-Опишите проблему и итоговое поведение.
+Describe the problem and resulting behavior.
 
-## Проверка
+## Validation
 
 - [ ] `python3 -m unittest discover -v`
 - [ ] `git diff --check`
-- [ ] Документация обновлена, если поведение или CLI изменились
-- [ ] Нет локального состояния, реальных UUID/серийных номеров, личных путей или секретов
+- [ ] Documentation updated when behavior or the CLI changes
+- [ ] All added text is in English
+- [ ] No local state, real UUIDs/serial numbers, personal paths, or secrets
 
-Аппаратная проверка (если была): модель Mac/дисплея, подключение, macOS, что прочитано программно и что подтверждено визуально. Не вставляйте уникальные идентификаторы устройств.
+Hardware validation, if performed: Mac/display models, connection, macOS version, what was read programmatically, and what was confirmed visually. Do not include unique device identifiers.

@@ -39,7 +39,7 @@ class BrightnessTests(unittest.TestCase):
 
     def test_unknown_external_rejected_before_opening_devices(self):
         with patch('brightness.External') as external, patch('brightness.Builtin') as builtin:
-            with self.assertRaisesRegex(RuntimeError, 'не совпадает'):
+            with self.assertRaisesRegex(RuntimeError, 'does not match'):
                 devices_for_screens([BUILTIN, LG], target='another')
             external.assert_not_called()
             builtin.assert_not_called()
@@ -86,7 +86,7 @@ class BrightnessTests(unittest.TestCase):
 
     def test_partial_write_restores_both(self):
         devices = {'LG': Device(0.2), 'MacBook': Device(0.9, fail=True)}
-        with self.assertRaisesRegex(RuntimeError, 'Исходная яркость восстановлена'):
+        with self.assertRaisesRegex(RuntimeError, 'Original brightness restored'):
             apply(devices, 0.5)
         self.assertEqual([d.get() for d in devices.values()], [0.2, 0.9])
 

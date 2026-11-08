@@ -29,7 +29,7 @@ class SwitchTests(unittest.TestCase):
     def test_brightness_failure_keeps_monitor_on_and_retry_does_not_reenable(self):
         self.control.act('off')
         self.control.after_on = Mock(side_effect=RuntimeError('DDC unavailable'))
-        with self.assertRaisesRegex(RuntimeError, 'Экран включён.*яркость не синхронизирована'):
+        with self.assertRaisesRegex(RuntimeError, 'display is enabled.*brightness was not synchronized'):
             self.control.act('on')
         self.assertFalse(json.loads(self.path.read_text())['disabled'])
         self.assertTrue(any(s['id'] == 'lg' for s in self.screens))
@@ -64,7 +64,7 @@ class SwitchTests(unittest.TestCase):
 
     def test_on_already_active_makes_no_api_calls(self):
         self.save()
-        self.assertIn('уже включён', self.control.act('on'))
+        self.assertIn('already enabled', self.control.act('on'))
         self.assertEqual(self.calls, [])
         self.assertEqual(json.loads(self.path.read_text())['system_id'], 3)
         self.assertFalse(json.loads(self.path.read_text())['disabled'])
@@ -95,18 +95,18 @@ class SwitchTests(unittest.TestCase):
     def test_missing_numeric_id_does_not_guess(self):
         self.save()
         self.screens = [BUILTIN.copy()]
-        with self.assertRaisesRegex(RuntimeError, 'Нет сохранённого системного номера'):
+        with self.assertRaisesRegex(RuntimeError, 'No saved system display ID'):
             self.control.act('on')
         self.assertEqual(self.calls, [])
 
     def test_requires_builtin_for_off(self):
         self.screens = [LG.copy()]
-        with self.assertRaisesRegex(RuntimeError, 'крышку'):
+        with self.assertRaisesRegex(RuntimeError, 'lid'):
             self.control.act('off')
         self.assertEqual(self.calls, [])
 
     def test_never_switches_builtin(self):
-        with self.assertRaisesRegex(RuntimeError, 'встроенным'):
+        with self.assertRaisesRegex(RuntimeError, 'built-in'):
             self.control.act('off', 'internal')
         self.assertEqual(self.calls, [])
 
@@ -117,25 +117,25 @@ class SwitchTests(unittest.TestCase):
             self.change(number, enabled)
             raise RuntimeError('API returned an error')
         self.control.set_enabled = change
-        self.assertIn('активен', self.control.act('on'))
+        self.assertIn('active', self.control.act('on'))
 
     def test_success_code_without_observed_change_is_not_success(self):
         self.save(system_id=3)
         self.screens = [BUILTIN.copy()]
         self.control.set_enabled = lambda *_: None
-        with self.assertRaisesRegex(RuntimeError, 'не подтверждено'):
+        with self.assertRaisesRegex(RuntimeError, 'not confirmed'):
             self.control.act('on')
 
     def test_no_access_is_not_off_success(self):
         self.screens = []
-        with self.assertRaisesRegex(RuntimeError, 'не вернула'):
+        with self.assertRaisesRegex(RuntimeError, 'did not return'):
             self.control.act('off')
         self.assertEqual(self.calls, [])
 
     def test_id_reuse_rejected(self):
         self.save(system_id=1)
         self.screens = [BUILTIN.copy()]
-        with self.assertRaisesRegex(RuntimeError, 'номер сменился'):
+        with self.assertRaisesRegex(RuntimeError, 'display ID changed'):
             self.control.act('on')
         self.assertEqual(self.calls, [])
 
@@ -167,14 +167,14 @@ class SwitchTests(unittest.TestCase):
         self.control.act('off')
         self.screens = [BUILTIN.copy(), dict(LG, origin=[1512, 0])]
         self.control.set_origins = lambda _: None
-        with self.assertRaisesRegex(RuntimeError, 'координаты не совпали'):
+        with self.assertRaisesRegex(RuntimeError, 'coordinates do not match'):
             self.control.act('on')
         self.assertTrue(json.loads(self.path.read_text())['layout_pending'])
 
     def test_changed_display_set_does_not_apply_partial_layout(self):
         self.control.act('off')
         self.screens = [BUILTIN.copy(), LG.copy(), dict(LG, id='other', system_id=7)]
-        with self.assertRaisesRegex(RuntimeError, 'состав дисплеев изменился'):
+        with self.assertRaisesRegex(RuntimeError, 'set of displays changed'):
             self.control.act('on')
         self.assertEqual(self.positions, [])
 
@@ -187,7 +187,7 @@ class SwitchTests(unittest.TestCase):
 
     def test_missing_coordinates_refuse_off_before_mutation(self):
         self.screens[1]['origin'] = None
-        with self.assertRaisesRegex(RuntimeError, 'координаты'):
+        with self.assertRaisesRegex(RuntimeError, 'coordinates'):
             self.control.act('off')
         self.assertEqual(self.calls, [])
 

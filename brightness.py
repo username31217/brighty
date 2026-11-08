@@ -20,7 +20,7 @@ DDC = '/opt/homebrew/bin/m1ddc'
 
 def target_level(current):
     if not math.isfinite(current) or not 0 <= current <= 1:
-        raise RuntimeError('Некорректная текущая яркость.')
+        raise RuntimeError('Invalid current brightness.')
     return 1.0 if current < 0.75 else 0.5
 
 
@@ -37,15 +37,15 @@ class Builtin:
         value = C.c_float()
         rc = self.api.DisplayServicesGetBrightness(self.number, C.byref(value))
         if rc:
-            raise RuntimeError(f'Не удалось прочитать яркость MacBook: код {rc}.')
+            raise RuntimeError(f'Could not read MacBook brightness: code {rc}.')
         if not math.isfinite(value.value) or not 0 <= value.value <= 1:
-            raise RuntimeError('macOS вернула некорректную яркость MacBook.')
+            raise RuntimeError('macOS returned an invalid MacBook brightness value.')
         return value.value
 
     def set(self, value):
         rc = self.api.DisplayServicesSetBrightness(self.number, value)
         if rc:
-            raise RuntimeError(f'Не удалось изменить яркость MacBook: код {rc}.')
+            raise RuntimeError(f'Could not set MacBook brightness: code {rc}.')
 
     def quantize(self, value):
         return value
@@ -56,7 +56,7 @@ class External:
         self.uid = uid
         self.maximum = self.command('max', 'luminance')
         if self.maximum <= 0:
-            raise RuntimeError('DDC вернул некорректный максимум яркости.')
+            raise RuntimeError('DDC returned an invalid maximum brightness.')
 
     def command(self, *args):
         process = subprocess.run([DDC, 'display', self.uid, *map(str, args)],
@@ -68,12 +68,12 @@ class External:
         try:
             return int(process.stdout.strip())
         except ValueError:
-            raise RuntimeError(f'Некорректный ответ DDC: {process.stdout.strip()!r}') from None
+            raise RuntimeError(f'Invalid DDC response: {process.stdout.strip()!r}') from None
 
     def get(self):
         raw = self.command('get', 'luminance')
         if not 0 <= raw <= self.maximum:
-            raise RuntimeError('DDC вернул яркость вне диапазона.')
+            raise RuntimeError('DDC returned an out-of-range brightness value.')
         return raw / self.maximum
 
     def quantize(self, value):
@@ -89,7 +89,7 @@ def verify(device, expected):
         if abs(actual - expected) <= 0.005:
             return actual
         time.sleep(0.15)
-    raise RuntimeError(f'Яркость не подтверждена: ожидалось {expected:.1%}, получено {actual:.1%}.')
+    raise RuntimeError(f'Brightness verification failed: expected {expected:.1%}, received {actual:.1%}.')
 
 
 def apply(devices, level):
@@ -110,7 +110,7 @@ def apply(devices, level):
                 verify(device, device.quantize(previous[name]))
             except (RuntimeError, OSError, subprocess.TimeoutExpired) as rollback_error:
                 failures.append(f'{name}: {rollback_error}')
-        detail = (' Ошибка возврата: ' + '; '.join(failures)) if failures else ' Исходная яркость восстановлена.'
+        detail = (' Rollback failed: ' + '; '.join(failures)) if failures else ' Original brightness restored.'
         raise RuntimeError(str(error) + detail) from error
     return {name: device.get() for name, device in devices.items()}
 
@@ -120,13 +120,13 @@ def devices_for_screens(screens, target=None):
     builtin = [s for s in screens if s['builtin']]
     external = [s for s in screens if s['external']]
     if not screens or len(builtin) > 1 or len(external) > 1 or len(screens) != len(builtin) + len(external):
-        raise RuntimeError('Нужен MacBook и/или один сохранённый внешний экран Brighty. Яркость не изменена.')
+        raise RuntimeError('A MacBook and/or one saved Brighty external display is required. Brightness was not changed.')
     if external:
         if target is None:
             saved = json.loads(STATE.read_text()) if STATE.exists() else {}
             target = saved.get('id')
         if external[0]['id'] != target:
-            raise RuntimeError('Внешний экран не совпадает с сохранённым экраном Brighty. Яркость не изменена.')
+            raise RuntimeError('The external display does not match the saved Brighty display. Brightness was not changed.')
     devices = {}
     if external:
         devices['LG'] = External(external[0]['id'])
@@ -153,7 +153,7 @@ def connect():
     main_id = cg.CGMainDisplayID()
     main = next((s for s in screens if s['system_id'] == main_id), None)
     if main is None:
-        raise RuntimeError('Не удалось определить главный экран macOS.')
+        raise RuntimeError('Could not identify the main macOS display.')
     return devices, 'MacBook' if main['builtin'] else 'LG'
 
 
@@ -167,7 +167,7 @@ def brightness_lock(wait=0):
                 break
             except BlockingIOError:
                 if time.monotonic() >= deadline:
-                    raise RuntimeError('Предыдущее переключение яркости ещё выполняется.') from None
+                    raise RuntimeError('The previous brightness change is still running.') from None
                 time.sleep(0.1)
         yield
 
@@ -180,12 +180,12 @@ def sync_external(target=None):
                 screens = available_screens()
                 devices = devices_for_screens(screens, target)
                 if 'LG' not in devices:
-                    raise RuntimeError('LG ещё не появился среди активных экранов.')
+                    raise RuntimeError('LG has not appeared among the available displays yet.')
                 if 'MacBook' not in devices:
-                    return ' MacBook не активен; яркость LG оставлена без изменений.'
+                    return ' MacBook is not available; LG brightness was left unchanged.'
                 level = devices['MacBook'].get()
                 apply({'LG': devices['LG']}, level)
-                return f' Яркость LG синхронизирована с MacBook: {level:.1%}.'
+                return f' LG brightness synchronized with MacBook: {level:.1%}.'
             except (RuntimeError, OSError, subprocess.TimeoutExpired):
                 if attempt == 2:
                     raise
@@ -193,7 +193,7 @@ def sync_external(target=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Аппаратная яркость обоих экранов: 50% ↔ 100%.')
+    parser = argparse.ArgumentParser(description='Hardware display brightness: 50% ↔ 100%.')
     parser.add_argument('action', choices=['status', 'half', 'max', 'toggle', 'sync'])
     args = parser.parse_args()
     if args.action == 'sync':
@@ -208,7 +208,7 @@ def main():
             return
         level = target_level(current[main_name]) if args.action == 'toggle' else {'half': 0.5, 'max': 1.0}[args.action]
         result = apply(devices, level)
-        print(f'Главный экран: {main_name}, было {current[main_name]:.1%}. '
+        print(f'Main display: {main_name}, previously {current[main_name]:.1%}. '
               + ' '.join(f'{name}: {value:.1%}.' for name, value in result.items()))
 
 

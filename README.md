@@ -1,29 +1,29 @@
 # Brighty
 
-**Горячие клавиши для внешнего монитора и аппаратной яркости на Apple Silicon Mac.**
+**Keyboard shortcuts for an external display and hardware brightness on Apple Silicon Macs.**
 
-Brighty отключает и возвращает внешний дисплей, восстанавливает расположение экранов и переключает яркость между 50% и 100%. Работает из Terminal и штатного приложения macOS «Команды». Без фонового сервиса, pip-зависимостей и платных приложений.
+Brighty disconnects and restores an external display, restores display positions, and switches brightness between 50% and 100%. Run it from Terminal or the built-in macOS Shortcuts app. No background service, pip dependencies, or paid apps are required.
 
-| Действие | Рекомендуемые клавиши |
+| Action | Suggested shortcut |
 | --- | --- |
-| Отключить / включить внешний монитор | **⌃⌥⌘M** |
-| Переключить яркость доступных экранов 50% ↔ 100% | **⌃⌥⌘B** |
+| Disconnect / enable the external display | **⌃⌥⌘M** |
+| Toggle available displays between 50% and 100% brightness | **⌃⌥⌘B** |
 
-> Проверено на MacBook Pro M1 Pro и LG 27UL850-W через USB-C. Это экспериментальный инструмент: он использует приватные macOS API. Совместимость с другими экранами и будущими версиями macOS не гарантирована. Отключение дисплея не отключает питание USB-C, зарядку и USB-хаб.
+> Tested on a MacBook Pro M1 Pro and an LG 27UL850-W over USB-C. This is an experimental tool that uses private macOS APIs. Compatibility with other displays or future macOS versions is not guaranteed. Disconnecting a display does not cut USB-C power, charging, or the USB hub.
 
-## Что умеет
+## Features
 
-- Отключать только внешний экран, сохраняя работающий встроенный дисплей.
-- Включать исчезнувший из списка экран по сохранённому системному ID.
-- Перед отключением сохранять координаты дисплеев по UUID, после включения восстанавливать их.
-- Выбирать положение яркости по **текущему главному экрану macOS**, а не по старому флагу.
-- Менять яркость одного MacBook, пока внешний экран отключён.
-- При включении внешнего экрана через Brighty копировать на него живую яркость MacBook.
-- Проверять результат чтением и пытаться вернуть прежнюю яркость при частичной ошибке.
+- Disconnect only the external display while keeping the built-in display active.
+- Enable a display that disappeared from discovery using its saved system ID.
+- Save display coordinates by UUID before disconnecting and restore them after enabling.
+- Choose the brightness target from the **current main macOS display**, rather than a saved flag.
+- Adjust MacBook brightness while the external display is disconnected.
+- Copy live MacBook brightness to the external display when enabling it through Brighty.
+- Verify changes by reading state again and attempt brightness rollback after a partial failure.
 
-## Установка на другом Mac
+## Install on another Mac
 
-Требования: Apple Silicon Mac, macOS с графическим сеансом, Homebrew, Python **3.10+**, внешний монитор с DDC/CI через поддерживаемое подключение. Для отключения внешнего экрана крышка MacBook должна быть открыта.
+Requirements: an Apple Silicon Mac, macOS with a graphical session, Homebrew, Python **3.10+**, and an external monitor supporting DDC/CI over a supported connection. Keep the MacBook lid open when disconnecting the external display.
 
 ```sh
 brew install python displayplacer m1ddc
@@ -33,133 +33,135 @@ export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 python3 brighty.py list
 ```
 
-Homebrew устанавливается отдельно по [официальной инструкции](https://brew.sh/). В `brightness.py` путь m1ddc сейчас задан как `/opt/homebrew/bin/m1ddc`, что соответствует стандартной установке Homebrew на Apple Silicon. При другом размещении исправьте константу `DDC`.
+Install Homebrew separately using its [official instructions](https://brew.sh/). The m1ddc path in `brightness.py` is currently `/opt/homebrew/bin/m1ddc`, the default Homebrew location on Apple Silicon. Change the `DDC` constant if your installation uses another location.
 
-Пока внешний экран **включён**, инициализируйте его состояние:
+While the external display is **enabled**, initialize local state:
 
 ```sh
 python3 brighty.py save-layout
 python3 brightness.py status
 ```
 
-При единственном внешнем экране он выбирается автоматически. При нескольких укажите UUID из `list`:
+A single external display is selected automatically. If several are connected, specify the UUID reported by `list`:
 
 ```sh
 python3 brighty.py save-layout --id YOUR_EXTERNAL_DISPLAY_UUID
 ```
 
-Управление подключением поддерживает выбор одного внешнего экрана; управление яркостью пока рассчитано на один встроенный и не более одного сохранённого внешнего. Папка проекта должна быть доступна для записи: рядом со скриптами создаются локальные состояние и блокировка. Не копируйте `.brighty-state.json` с другой машины — создайте свой.
+Connection control can select one external display; brightness control currently supports one built-in display and at most one saved external display. The project directory must be writable: local state and a lock file are created next to the scripts. Do not copy `.brighty-state.json` from another machine; create your own.
 
-## Команды
+## Commands
 
-### Подключение и расположение
-
-```sh
-python3 brighty.py list         # дисплеи, UUID, ID, координаты
-python3 brighty.py status       # состояние сохранённого внешнего экрана
-python3 brighty.py off          # сохранить схему и отключить внешний экран
-python3 brighty.py on           # включить, вернуть схему, синхронизировать яркость
-python3 brighty.py toggle       # выбрать off/on по фактическому состоянию
-python3 brighty.py save-layout  # сохранить текущую схему без переключения
-```
-
-Для выбора дисплея команды принимают `--id UUID`. Сначала испытайте отдельные `off` и `on` с открытой крышкой и доступным Terminal. Дождитесь завершения одной команды перед следующей. Если `on` сообщает об ошибке яркости, экран уже может быть включён: повторите `on`, чтобы повторить синхронизацию без переподключения.
-
-### Яркость
+### Connection and layout
 
 ```sh
-python3 brightness.py status  # JSON: главный экран и яркость 0…1
-python3 brightness.py half    # доступным экранам 50%
-python3 brightness.py max     # доступным экранам 100%
-python3 brightness.py toggle  # вычислить по главному и переключить
-python3 brightness.py sync    # скопировать текущую яркость MacBook на внешний экран
+python3 brighty.py list         # displays, UUIDs, system IDs, and coordinates
+python3 brighty.py status       # saved external display state
+python3 brighty.py off          # save the layout and disconnect the external display
+python3 brighty.py on           # enable, restore the layout, and synchronize brightness
+python3 brighty.py toggle       # choose off/on using the observed state
+python3 brighty.py save-layout  # save the current layout without switching
 ```
 
-| Текущая яркость главного | Новая яркость доступных экранов |
+Commands accept `--id UUID` to select a display. First test separate `off` and `on` calls with the lid open and Terminal accessible. Wait for each command to finish. If `on` reports a brightness error, the display may already be enabled: repeat `on` to retry synchronization without reconnecting it.
+
+### Brightness
+
+```sh
+python3 brightness.py status  # JSON: main display and brightness in the range 0…1
+python3 brightness.py half    # set available displays to 50%
+python3 brightness.py max     # set available displays to 100%
+python3 brightness.py toggle  # choose the opposite target using the main display
+python3 brightness.py sync    # copy current MacBook brightness to the external display
+```
+
+| Current main-display brightness | New brightness of available displays |
 | --- | --- |
-| От 0% до 75%, не включая 75% | 100% |
-| От 75% до 100% включительно | 50% |
+| 0% up to, but not including, 75% | 100% |
+| 75% through 100%, inclusive | 50% |
 
-Ровно 75% равноудалено от двух положений; принято правило **75% → 50%**. Например, 0% → 100%, 50% → 100%, 90% → 50%.
+Exactly 75% is equidistant from the two targets; the tie-breaking rule is **75% → 50%**. Examples: 0% → 100%, 50% → 100%, and 90% → 50%.
 
-При одном MacBook внешний экран не опрашивается через DDC. При возврате внешнего экрана через `on` или горячую клавишу подключения его яркость копируется с MacBook: 50% остаётся 50%, 100% — 100%, промежуточное значение также копируется. Сам MacBook при этом не меняется. Копирование после `on` всегда использует MacBook как источник; обычный `toggle` использует главный экран macOS, которым может быть и внешний.
+With only the MacBook available, no DDC request is sent to the external display. When the external display returns through `on` or the connection shortcut, its brightness is copied from the MacBook: 50% stays 50%, 100% stays 100%, and intermediate values are copied too. The MacBook itself is not changed. Post-`on` copying always uses the MacBook as the source; normal `toggle` uses the main macOS display, which may be external.
 
-50% — половина диапазона аппаратного регулятора каждого дисплея, а не одинаковое число нит или субъективная яркость. DDC использует фактический максимум монитора и округляет цель до ближайшего целого; для испытанного LG это 50 из 100.
+50% means half of each display's hardware control range, not matching nits or perceived brightness. DDC uses the monitor's actual maximum and rounds to the nearest integer; on the tested LG, half is 50 out of 100.
 
-## Настройка горячих клавиш
+## Set up keyboard shortcuts
 
-Команды macOS хранятся вне Git. На новой машине создайте их самостоятельно; checkout не назначает сочетания автоматически.
+macOS shortcuts live outside Git. Create them on each machine; checking out the repository does not assign keyboard shortcuts automatically.
 
-1. Откройте «Команды» → Settings → Advanced → **Allow Running Scripts**.
-2. Создайте «Переключить монитор» с действием **Run Shell Script**, Shell **/bin/zsh**, без Run as Administrator.
-3. Вставьте код ниже, заменив путь к checkout на свой:
+1. Open Shortcuts → Settings → Advanced → **Allow Running Scripts**.
+2. Create **Toggle Monitor** with a **Run Shell Script** action, Shell **/bin/zsh**, and Run as Administrator disabled.
+3. Paste the following, replacing the checkout path with your own:
 
 ```sh
 export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 /opt/homebrew/bin/python3 "/absolute/path/to/brighty/brighty.py" toggle
 ```
 
-4. В сведениях команды **ⓘ → Details → Add Keyboard Shortcut** назначьте **Control+Option+Command+M**, затем выйдите из поля клавиш нажатием Tab.
-5. Создайте «Переключить яркость» с аналогичным действием и сочетанием **Control+Option+Command+B**:
+4. In **ⓘ → Details → Add Keyboard Shortcut**, assign **Control+Option+Command+M**, then press Tab to leave the shortcut field.
+5. Create **Toggle Brightness** with the equivalent action and **Control+Option+Command+B**:
 
 ```sh
 export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 /opt/homebrew/bin/python3 "/absolute/path/to/brighty/brightness.py" toggle
 ```
 
-При назначении macOS включает Quick Action / Services Menu. Проверьте конфликт сочетаний на своей машине и первый запуск кнопкой Run. macOS может запросить доступ к папке со скриптом, например Documents. Для изменения сочетания выберите поле Run with и введите новое; для удаления очистите его Delete/Backspace. Удаление команды из библиотеки не удаляет проект. После перемещения checkout исправьте абсолютные пути в действиях.
+macOS enables Quick Action / Services Menu when a keyboard shortcut is assigned. Check for conflicts on your machine and test the first execution using Run. macOS may request access to the script's folder, such as Documents. To change the shortcut, select Run with and enter a new combination; clear it with Delete/Backspace to remove it. Deleting the shortcut does not delete the project. Update absolute paths in the actions after moving your checkout.
 
-## Восстановление и диагностика
+The scripts run directly from your checkout. Updating those files updates your local installation immediately; no build or reinstall step is required. Keep the same checkout path to preserve existing shortcut actions.
 
-Если внешний экран не появился:
+## Recovery and troubleshooting
+
+If the external display does not return:
 
 ```sh
 python3 brighty.py on
 ```
 
-Если сохранённый числовой ID отсутствует или устарел, отдельная аварийная команда умеет пробовать включение:
+If the saved numeric ID is missing or stale, a separate recovery command can attempt enabling displays:
 
 ```sh
-python3 recover_display.py                # только диагностика
-python3 recover_display.py --apply       # сохранённый ID
-python3 recover_display.py --all --apply # перебор неактивных ID 1…10
+python3 recover_display.py                # diagnostics only
+python3 recover_display.py --apply       # use the saved ID
+python3 recover_display.py --all --apply # try inactive IDs 1…10
 ```
 
-Последний вариант может включить другие отключённые экраны. Он не предназначен для обычного переключения. Если восстановление не помогает, сохраните работу и перезагрузите Mac. Автоматической перезагрузки, удаления системных настроек и отключения через displayplacer нет.
+The last command may enable other disabled displays. It is not intended for ordinary toggling. If recovery fails, save your work and restart the Mac. There is no automatic restart, deletion of system settings, or connection control through displayplacer.
 
-| Симптом | Что проверить |
+| Symptom | Check |
 | --- | --- |
-| Пустой список дисплеев | Обычный Terminal в текущем графическом сеансе, без ограниченной песочницы |
-| Неизвестный внешний экран | Выполнить `list`, затем `save-layout --id UUID` при включённом нужном дисплее |
-| Ошибка DDC | Кабель/адаптер, DDC/CI в настройках монитора; `m1ddc display list`, `m1ddc display UUID get luminance` |
-| Экран включился, яркость не скопировалась | Повторить `brighty.py on` или `brightness.py sync` после готовности DDC |
-| Координаты не восстановились | Состав дисплеев должен совпадать с сохранённым; повторить `on` |
-| Горячая клавиша не работает | Проверить Run, абсолютные пути, Allow Running Scripts и конфликты клавиш |
+| Empty display list | Run from a regular Terminal in the current graphical session, outside a restricted sandbox |
+| Unknown external display | Run `list`, then `save-layout --id UUID` with the intended display enabled |
+| DDC error | Cable/adapter, the monitor's DDC/CI setting; `m1ddc display list`, `m1ddc display UUID get luminance` |
+| Display enabled but brightness not copied | Retry `brighty.py on` or `brightness.py sync` once DDC is ready |
+| Coordinates not restored | The display set must match the saved layout; retry `on` |
+| Keyboard shortcut does not work | Check Run, absolute paths, Allow Running Scripts, and shortcut conflicts |
 
-## Ограничения и статус проверки
+## Limitations and validation status
 
-- Реальный стенд: Apple Silicon MacBook Pro M1 Pro + LG 27UL850-W через USB-C. Intel, произвольные HDMI-адаптеры и другие мониторы не проверены.
-- Восстанавливаются координаты расширенного рабочего стола. Зеркалирование отклоняется; разрешение, масштаб, поворот, раскладка окон и калибровка не сохраняются.
-- Числовые ID меняются после переподключения/перезагрузки. Отсутствие дисплея не отличает отключение от отсоединённого кабеля; приватные API могут измениться.
-- Нет фонового наблюдателя. После физического переподключения без Brighty выполните `on` или `sync`. Автояркость, HDR и параметры энергосбережения могут позднее изменить результат.
-- Повторный вызов яркости во время работы отклоняется. Изменения двух устройств последовательные; откат при ошибке выполняется по возможности. Не запускайте off/on и изменение яркости одновременно.
-- Подтверждение активности macOS не доказывает наличие изображения, переход монитора в ожидание или экономию энергии.
-- На оборудовании проверены off/on, восстановление координат, яркость двух экранов 100% → 50% → 100%, запуск яркости из Finder горячей клавишей и переключение единственного MacBook. Новый путь синхронизации яркости после возврата LG покрыт тестами; отдельный реальный цикл этого пути пока не подтверждён.
+- Hardware test setup: Apple Silicon MacBook Pro M1 Pro + LG 27UL850-W over USB-C. Intel, arbitrary HDMI adapters, and other monitors have not been tested.
+- Extended-desktop coordinates are restored. Mirroring is rejected; resolution, scaling, rotation, window positions, and calibration are not saved.
+- Numeric IDs can change after reconnecting or restarting. A missing display may be disabled or unplugged; private APIs can change.
+- There is no background observer. After physically reconnecting without Brighty, run `on` or `sync`. Auto-brightness, HDR, and power-saving settings may change brightness later.
+- Overlapping brightness calls are rejected. Device updates are sequential and rollback is best effort. Do not run off/on and brightness changes simultaneously.
+- macOS activity does not prove visible output, monitor standby, or power savings.
+- Hardware validation covers off/on, coordinate restoration, a two-display 100% → 50% → 100% brightness cycle, brightness invocation from Finder using the keyboard shortcut, and MacBook-only toggling. The new post-return brightness synchronization path has unit coverage; a separate real hardware cycle for that path has not yet been confirmed.
 
-## Разработка
+## Development
 
 ```sh
 python3 -m unittest discover -v
 ```
 
-**34 теста** используют подставные устройства и не переключают реальные мониторы. Для них не нужны Homebrew-утилиты или macOS frameworks; запуск возможен на Linux и macOS. GitHub Actions выполняет эти проверки для Python 3.10 и 3.14. Проверки с реальным оборудованием выполняются отдельно и только по явной договорённости.
+**34 tests** use fake devices and do not change real displays. They require neither Homebrew utilities nor macOS frameworks and can run on Linux or macOS. GitHub Actions runs these checks on Python 3.10 and 3.14. Real hardware checks are separate and require explicit authorization.
 
-- [Архитектура и инварианты](ARCHITECTURE.md)
-- [Как вносить изменения и адаптировать под свой Mac](CONTRIBUTING.md)
-- [Инструкции для агентов](AGENTS.md)
-- [История изменений](CHANGELOG.md)
-- [Сообщение об уязвимости](SECURITY.md)
+- [Architecture and invariants](ARCHITECTURE.md)
+- [Contributing and adapting to another Mac](CONTRIBUTING.md)
+- [Agent instructions](AGENTS.md)
+- [Changelog](CHANGELOG.md)
+- [Reporting a vulnerability](SECURITY.md)
 
-## Лицензия и зависимости
+## License and dependencies
 
-[MIT](LICENSE). Внешние инструменты устанавливаются отдельно и сохраняют собственные лицензии: [displayplacer](https://github.com/jakehilborn/displayplacer), [m1ddc](https://github.com/waydabber/m1ddc). Исходники этих проектов в репозиторий не включены.
+[MIT](LICENSE). External tools are installed separately under their own licenses: [displayplacer](https://github.com/jakehilborn/displayplacer), [m1ddc](https://github.com/waydabber/m1ddc). Their source code is not bundled in this repository.

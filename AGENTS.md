@@ -2,7 +2,7 @@
 
 ## Start here
 
-Read README.md, ARCHITECTURE.md, CONTRIBUTING.md, and CHANGELOG.md. This is a small Python 3.10+ macOS CLI project. User-facing CLI errors and primary documentation are in Russian; code names and concise implementation comments are in English.
+Read README.md, ARCHITECTURE.md, CONTRIBUTING.md, and CHANGELOG.md. This is a small Python 3.10+ macOS CLI project. All tracked documentation, user-facing CLI output, source comments, and tests must be in English. Preserve behavior when translating text.
 
 Run safe verification with `python3 -m unittest discover -v` and `git diff --check`. Tests mock hardware and need no Homebrew tools, macOS frameworks, or display session. Do not add dependencies just to run existing tests. Do not run display-changing commands as part of automated tests or CI.
 

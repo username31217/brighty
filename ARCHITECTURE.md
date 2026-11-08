@@ -1,79 +1,79 @@
-# Устройство Brighty
+# Brighty architecture
 
-## Назначение и окружение
+## Purpose and environment
 
-Локальные одноразовые CLI-команды, запускаемые пользователем или штатным приложением macOS «Команды». Целевая машина — Apple Silicon MacBook Pro M1 Pro, внешний LG 27UL850-W через USB-C, расширенный рабочий стол. Службы, сервер, сеть при использовании и постоянно работающий процесс не нужны.
+Local, one-shot CLI commands invoked by the user or the built-in macOS Shortcuts app. The target setup is an Apple Silicon MacBook Pro M1 Pro with an LG 27UL850-W over USB-C in extended-desktop mode. No server, network access during use, daemon, or persistent process is required.
 
-## Зависимости и установка
+## Dependencies and installation
 
-- macOS с текущим графическим сеансом и открытой крышкой MacBook.
-- Python 3.10+ из Homebrew: `/opt/homebrew/bin/python3`. Все импорты Python — стандартная библиотека.
-- `displayplacer` из Homebrew: только обнаружение активных дисплеев, UUID, числовых ID и координат.
-- `m1ddc` 1.3.1 из Homebrew: аппаратная яркость LG через DDC/CI. MIT, бесплатная CLI-утилита; работает на Apple Silicon. На испытанном LG get/max luminance возвращали корректные значения, максимум 100.
-- Системные ApplicationServices/CoreGraphics и приватные DisplayServices доступны через `ctypes`.
-- Для горячих клавиш: приложение «Команды», включённое Allow Running Scripts, shell `/bin/zsh`. На первом запуске возможен запрос macOS к Documents.
-- На другом Mac зависимости можно установить `brew install python displayplacer m1ddc`, затем исправить абсолютные пути в командах. Предварительно требуется Homebrew; установка Homebrew не входит в скрипты.
+- macOS with a graphical session and an open MacBook lid for external-display disconnection.
+- Python 3.10+ from Homebrew: `/opt/homebrew/bin/python3`. All Python imports use the standard library.
+- Homebrew `displayplacer`: display discovery, UUIDs, numeric IDs, and coordinates only.
+- Homebrew `m1ddc` 1.3.1: external hardware brightness over DDC/CI. It is a free MIT-licensed Apple Silicon CLI. The tested LG answered get/max luminance correctly and reported a maximum of 100.
+- System ApplicationServices/CoreGraphics and private DisplayServices frameworks accessed through `ctypes`.
+- For keyboard shortcuts: Shortcuts, Allow Running Scripts enabled, and `/bin/zsh`. The first run may request access to Documents.
+- On another Mac, install dependencies with `brew install python displayplacer m1ddc`, then adjust absolute paths in shortcut actions. Homebrew itself is installed separately.
 
-Ни root, ни sudo при использовании не нужны. Ограниченная песочница может не видеть дисплеи; запускать в обычном пользовательском графическом сеансе. При настройке чтение из ограниченного окружения вернуло пустой список, из обычного сеанса — оба экрана.
+Normal operation requires neither root nor sudo. A restricted sandbox may not see displays; run in a regular user graphical session. During setup, restricted discovery returned an empty list while the regular session returned both screens.
 
-## Файлы
+## Files
 
-| Файл | Ответственность |
+| File | Responsibility |
 | --- | --- |
-| `brighty.py` | CLI list/status/on/off/toggle/save-layout, обнаружение, выбор внешнего экрана, состояние и восстановление расположения |
-| `display_api.py` | Транзакции CoreGraphics: приватное включение/отключение и документированное позиционирование |
-| `recover_display.py` | Отдельное аварийное включение с ограниченным перебором номеров, только с явным `--apply` |
-| `brightness.py` | CLI status/half/max/toggle/sync для доступных экранов и синхронизации LG после on |
-| `test_brighty.py` | 22 теста логики подключения и расположения с подставным API |
-| `test_brightness.py` | 12 тестов одного/двух экранов, синхронизации после on, порога, валидации, синхронизации, отката и DDC-шкалы |
-| `.brighty-state.json` | UUID LG, последний числовой ID, флаг отключения, координаты по UUID, необходимость восстановления |
-| `.brightness.lock` | Пустой файл для `flock`; не хранит яркость. Блокировка снимается ОС при выходе процесса |
-| `README.md` | Использование, горячие клавиши, восстановление, ограничения, результаты проверок |
-| `ARCHITECTURE.md` | Этот документ: структура, зависимости и технические решения |
-| `CHANGELOG.md` | История поведения и границы проверки |
-| `CONTRIBUTING.md` | Установка для разработки, адаптация, требования к изменениям |
-| `AGENTS.md` | Правила для кодирующих агентов и аппаратных проверок |
-| `.github/workflows/tests.yml` | Безопасные unit-тесты на Linux, без изменения дисплеев |
-| `.gitignore` | Исключение локального состояния, заметок, кэша и секретов |
+| `brighty.py` | list/status/on/off/toggle/save-layout CLI, discovery, external-display selection, state, and layout restoration |
+| `display_api.py` | CoreGraphics transactions: private connection changes and documented positioning |
+| `recover_display.py` | Separate emergency enabling with optional bounded ID probing; changes require `--apply` |
+| `brightness.py` | status/half/max/toggle/sync CLI for available displays and post-on synchronization |
+| `test_brighty.py` | 22 fake-API tests for connection and layout behavior |
+| `test_brightness.py` | 12 tests for one/two displays, post-on synchronization, thresholds, validation, rollback, and DDC scaling |
+| `.brighty-state.json` | External UUID, last numeric ID, disabled flag, coordinates by UUID, and pending-restoration flag |
+| `.brightness.lock` | Empty `flock` file; stores no brightness. The OS releases the lock when the process exits |
+| `README.md` | Usage, shortcuts, recovery, limitations, and validation status |
+| `ARCHITECTURE.md` | Module structure, dependencies, and design decisions |
+| `CHANGELOG.md` | Behavior history and validation limits |
+| `CONTRIBUTING.md` | Development setup, adaptation, and contribution requirements |
+| `AGENTS.md` | Coding-agent instructions and hardware-test invariants |
+| `.github/workflows/tests.yml` | Safe Linux unit tests without display changes |
+| `.gitignore` | Excludes local state, notes, caches, and credentials |
 
-`__pycache__` — автоматически создаваемый кэш Python. Runtime-файлы и локальные записи исключены через .gitignore. Телеметрии и облачного состояния нет. Команды и их сочетания хранятся самим macOS, не в папке проекта.
+`__pycache__` is generated by Python. Runtime files and local notes are ignored. There is no telemetry or cloud state. macOS stores shortcuts and their keyboard assignments outside the project directory.
 
-## Подключение и расположение
+## Connection and layout
 
-`brighty.py` разбирает `displayplacer list`, выбирает сохранённый UUID, проверяет защиту встроенного экрана. До off атомарно сохраняет ID и координаты в `.brighty-state.json` через временный файл и replace. Изменение подключения выполняется напрямую через `CGSConfigureDisplayEnabled`, не через displayplacer. Проверка результата — повторное чтение активных экранов. После on UUID сопоставляются с текущими числовыми ID, расположение применяется одной транзакцией `CGConfigureDisplayOrigin` с областью forSession. Параметр подключения forAppOnly сохранён из испытанного обхода; это отдельная операция с другим наблюдаемым поведением.
+`brighty.py` parses `displayplacer list`, selects the saved UUID, and protects the built-in display. Before off, it atomically saves the numeric ID and coordinates to `.brighty-state.json` using a temporary file and replace. Connection changes use `CGSConfigureDisplayEnabled` directly, never displayplacer. Fresh display reads verify the result. After on, UUIDs are mapped to current numeric IDs and the layout is applied in one `CGConfigureDisplayOrigin` transaction with forSession scope. The connection operation retains the tested workaround's forAppOnly option; it is separate from positioning and has different observed behavior.
 
-Механизм изменения подключения сохранён. Controller получил необязательный callback `after_on`, который вызывается после подтверждённого on и восстановления координат, включая on для уже включённого LG. Production CLI и recover_display.py передают `sync_brightness_after_on`; он лениво импортирует синхронизацию из brightness.py. Off/list/status не зависят от доступности DDC. Ошибка синхронизации явно сообщает, что экран уже включён; повторный on повторяет синхронизацию без отключения. Яркость только читает UUID из STATE и не записывает состояние подключения.
+`Controller` accepts an optional `after_on` callback. It runs after confirmed enabling and layout restoration, including on for an already enabled external display. The production CLI and recover_display.py pass `sync_brightness_after_on`, which lazily imports brightness synchronization. Off/list/status do not depend on DDC availability. Synchronization failure explicitly reports that the display is enabled; another on retries synchronization without disconnecting. Brightness code reads the UUID from STATE and never writes connection state.
 
-## Яркость: поток выполнения
+## Brightness execution flow
 
-1. CLI захватывает неблокирующую `flock` на `.brightness.lock`. Перекрывающиеся вызовы яркости завершаются сообщением; очереди toggle нет.
-2. `available_screens()` читает дисплеи и проверяет CGDisplayIsOnline. Это отличает программное отключение от сна: displayplacer Enabled/CGDisplayIsActive могут стать false во сне, хотя MacBook остаётся online и его яркость доступна. `devices_for_screens()` допускает MacBook отдельно, сохранённый LG отдельно или оба, сверяет UUID внешнего с Brighty. Неизвестный внешний экран, несколько внешних или пустой список отклоняются. При отсутствии LG объект External вообще не создаётся.
-3. `CGMainDisplayID()` определяет именно главный дисплей macOS. Он может быть встроенным или внешним.
-4. `Builtin` читает/меняет 0…1 через `DisplayServicesGetBrightness` / `DisplayServicesSetBrightness`, проверяет код результата и диапазон.
-5. `External` вызывает m1ddc с UUID, не с нестабильным порядковым номером. Читает собственный max luminance и get luminance, нормализует raw/max. Команды имеют таймаут 8 секунд; неправильный или пустой ответ считается ошибкой.
-6. `status` выводит JSON без изменения яркости. `half` выбирает 0.5, `max` — 1.0. `toggle` использует текущую яркость главного: ниже 0.75 → 1.0, иначе → 0.5. Старое положение нигде не сохраняется.
-7. `apply()` сначала читает исходные значения всех доступных устройств. При одном экране меняется только он. Затем меняет LG, проверяет чтением, меняет MacBook и проверяет чтением. Проверка повторяется до 8 раз с интервалом 0.15 секунды, допустимое отклонение 0.005 нормализованной шкалы.
-8. Для DDC цель округляется к ближайшему целому raw, половина при нечётном максимуме округляется вверх. Для фактического LG max=100 половина ровно 50. Проверка сравнивает с квантованной целью.
-9. Если запись/проверка не удалась, выполняется попытка вернуть исходные значения затронутых устройств в обратном порядке, также с проверкой. Ошибки отката сообщаются явно. Аппаратной атомарности нет; аварийное завершение процесса или отсоединение кабеля может помешать откату.
+1. The CLI obtains a nonblocking `flock` on `.brightness.lock`. Overlapping brightness commands fail with a message; toggles are not queued.
+2. `available_screens()` reads displays and checks CGDisplayIsOnline. This distinguishes software disconnection from display sleep: displayplacer Enabled/CGDisplayIsActive may be false during sleep while the MacBook remains online and its brightness is accessible. `devices_for_screens()` accepts the MacBook alone, the saved external display alone, or both. It validates the external UUID before changes and rejects an unknown external display, multiple external displays, or an empty list. Without an external display, no External adapter is constructed.
+3. `CGMainDisplayID()` identifies the main macOS display, either built-in or external.
+4. `Builtin` reads/writes values in 0…1 through `DisplayServicesGetBrightness` / `DisplayServicesSetBrightness` and checks return codes and range.
+5. `External` invokes m1ddc by UUID, never an unstable list index. It reads max luminance and get luminance, normalizing raw/max. Commands time out after 8 seconds; malformed or empty responses are errors.
+6. `status` prints JSON without changing brightness. `half` selects 0.5 and `max` selects 1.0. `toggle` reads the current main-display brightness: below 0.75 selects 1.0, otherwise 0.5. No previous brightness position is persisted.
+7. `apply()` reads the original values of every available device first. With one screen, only that screen changes. With two, it changes and verifies the external display, then the MacBook. Verification makes up to 8 reads at 0.15-second intervals with a normalized tolerance of 0.005.
+8. DDC targets are rounded to the nearest integer raw value, with half rounded upward for an odd maximum. On the tested LG, max=100 and half=50 exactly. Verification compares against the quantized target.
+9. On write/verification failure, affected devices are restored in reverse order where possible, with verification. Rollback errors are reported explicitly. There is no hardware atomicity; process termination or cable removal may prevent rollback.
 
-`sync_external()` после on берёт живую яркость MacBook и применяет её только к LG. Не использует порог toggle или старый файл состояния, не меняет MacBook. Разделяет блокировку с CLI яркости, ожидая до 5 секунд завершения текущего переключения. Если DDC ещё не готов, делает до трёх попыток с паузами 0.5 секунды. При отсутствии активного MacBook яркость единственного LG остаётся прежней.
+After on, `sync_external()` reads live MacBook brightness and applies it only to the external display. It neither toggles nor changes the MacBook, and does not use a saved brightness flag. It shares the CLI brightness lock and waits up to 5 seconds for an ongoing operation. If DDC is not ready, it retries up to three times with 0.5-second pauses. If the MacBook is unavailable, the lone external display keeps its brightness.
 
-Синхронизация означает одинаковую долю диапазона аппаратного регулятора, а не калибровку нит/гаммы. Автояркость, HDR, True Tone и параметры LG не изменяются. Постоянного слежения за ручной регулировкой и физическим подключением кабеля нет: состояние перечитывается при toggle/on/sync. Для возврата через горячую клавишу подключения это происходит автоматически; после физического переподключения без Brighty нужно вызвать on или sync.
+Synchronization means the same fraction of each hardware control range, not calibrated nits or gamma. Auto-brightness, HDR, True Tone, and monitor settings are not changed. There is no continuous observer for manual adjustments or cable hotplug: state is reread on toggle/on/sync. Return through the connection shortcut synchronizes automatically; physical reconnection without Brighty requires on or sync.
 
-## Горячие клавиши
+## Keyboard shortcuts and local installation
 
-Две команды «Команд»: «Переключить монитор» (⌃⌥⌘M) и «Переключить яркость» (⌃⌥⌘B). Каждая задаёт PATH с `/opt/homebrew/bin` и запускает соответствующий Python-файл с toggle. Quick Action / Services Menu включены системой при назначении клавиш.
+Two Shortcuts actions: **Toggle Monitor** (⌃⌥⌘M) and **Toggle Brightness** (⌃⌥⌘B). Each sets PATH to include `/opt/homebrew/bin` and runs the corresponding Python file with toggle. Assigning the key combination enables Quick Action / Services Menu.
 
-Команды создаются через поддерживаемый интерфейс «Команд», не редактированием системных plist. На каждой машине нужно проверить конфликты клавиш и создать действия со своими абсолютными путями. Библиотека «Команд», её UUID и регистрация служб не входят в checkout.
+Use the supported Shortcuts interface, not direct system-plist edits. Check conflicts and create actions with machine-specific absolute paths on each Mac. The Shortcuts library, its UUIDs, and service registrations are not included in a checkout.
 
-При переносе проекта сначала исправить путь к скрипту в действии. Удаление команды не удаляет код. После удаления команды яркости m1ddc можно оставить или отдельно удалить `brew uninstall m1ddc`, если он не используется другими инструментами.
+Scripts execute directly from the checkout: editing/updating files updates the local installation immediately. After moving the checkout, update shortcut paths. Deleting a shortcut does not delete the code. After removing the brightness shortcut, m1ddc may be kept or separately removed using `brew uninstall m1ddc` if no other tools need it.
 
-## Источники решений
+## Design references
 
-- [m1ddc: команды get/max/set luminance, выбор по UUID](https://github.com/waydabber/m1ddc) — первичный README проекта.
-- [brightness.c: DisplayServices на Apple Silicon](https://github.com/nriley/brightness/blob/master/brightness.c) — проверенные сигнатуры get/set; CoreDisplay-вариант не выбран из-за описанных ограничений Apple Silicon.
-- [CoreGraphics CGConfigureDisplayOrigin](https://developer.apple.com/documentation/coregraphics/cgconfiguredisplayorigin(_:_:_:_:)) — расположение экранов.
-- [CoreGraphics forSession](https://developer.apple.com/documentation/coregraphics/cgconfigureoption/forsession) — срок действия расположения.
-- [Обсуждение восстановления displayplacer №137](https://github.com/jakehilborn/displayplacer/issues/137) — история обхода подключения, подробности в README.
+- [m1ddc: get/max/set luminance and UUID selection](https://github.com/waydabber/m1ddc) — primary project README.
+- [brightness.c: DisplayServices on Apple Silicon](https://github.com/nriley/brightness/blob/master/brightness.c) — get/set signatures; the CoreDisplay approach was not selected because of its documented Apple Silicon limitations.
+- [CoreGraphics CGConfigureDisplayOrigin](https://developer.apple.com/documentation/coregraphics/cgconfiguredisplayorigin(_:_:_:_:)) — display positioning.
+- [CoreGraphics forSession](https://developer.apple.com/documentation/coregraphics/cgconfigureoption/forsession) — layout lifetime.
+- [displayplacer recovery discussion #137](https://github.com/jakehilborn/displayplacer/issues/137) — background on connection recovery.
 
-DisplayServices и CGSConfigureDisplayEnabled — приватные API; их совместимость не гарантируется Apple. m1ddc также зависит от доступности DDC и системных интерфейсов. Обновления macOS требуют повторной проверки на реальном оборудовании.
+DisplayServices and CGSConfigureDisplayEnabled are private APIs; Apple does not guarantee their compatibility. m1ddc also depends on DDC and system-interface availability. macOS updates require hardware revalidation.

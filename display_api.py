@@ -22,31 +22,31 @@ class DisplayAPI:
         config = C.c_void_p()
         rc = self.cg.CGBeginDisplayConfiguration(C.byref(config))
         if rc:
-            raise RuntimeError(f'Не удалось начать восстановление расположения: {rc}.')
+            raise RuntimeError(f'Could not begin layout restoration: {rc}.')
         try:
             for number, x, y in positions:
                 rc = self.cg.CGConfigureDisplayOrigin(config, number, x, y)
                 if rc:
-                    raise RuntimeError(f'Не удалось задать координаты экрана {number}: {rc}.')
+                    raise RuntimeError(f'Could not set coordinates for display {number}: {rc}.')
         except BaseException:
             self.cg.CGCancelDisplayConfiguration(config)
             raise
         # kCGConfigureForSession: positions must survive this CLI process exiting.
         rc = self.cg.CGCompleteDisplayConfiguration(config, 1)
         if rc:
-            raise RuntimeError(f'Не удалось применить расположение экранов: {rc}.')
+            raise RuntimeError(f'Could not apply the display layout: {rc}.')
 
     def set_enabled(self, number, enabled):
         if not isinstance(number, int) or not 0 < number <= 0xFFFFFFFF:
-            raise RuntimeError('Нет корректного системного номера экрана.')
+            raise RuntimeError('No valid system display ID is available.')
         config = C.c_void_p()
         rc = self.cg.CGBeginDisplayConfiguration(C.byref(config))
         if rc:
-            raise RuntimeError(f'macOS: начало изменения дисплея, код {rc}.')
+            raise RuntimeError(f'macOS: beginning display configuration, code {rc}.')
         try:
             rc = self.cg.CGSConfigureDisplayEnabled(config, number, enabled)
             if rc:
-                raise RuntimeError(f'macOS: изменение экрана {number}, код {rc}.')
+                raise RuntimeError(f'macOS: configuring display {number}, code {rc}.')
         except BaseException:
             self.cg.CGCancelDisplayConfiguration(config)
             raise
@@ -54,4 +54,4 @@ class DisplayAPI:
         # The private enable API's observed behavior differs from positioning.
         rc = self.cg.CGCompleteDisplayConfiguration(config, 0)
         if rc:
-            raise RuntimeError(f'macOS: применение изменения экрана {number}, код {rc}.')
+            raise RuntimeError(f'macOS: applying configuration for display {number}, code {rc}.')

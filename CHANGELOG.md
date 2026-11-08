@@ -1,28 +1,34 @@
-# История изменений
+# Changelog
 
 ## Unreleased
 
-### Подготовка репозитория — 2026-11-09
+### English-only interface and documentation — 2026-11-09
 
-- README для чистого checkout на другом Mac: установка, первичная настройка, CLI, горячие клавиши, диагностика и ограничения.
-- Инструкции для разработчиков и агентов, описание архитектуры, правила безопасных аппаратных проверок.
-- MIT License, информация по безопасности, шаблон pull request и CI с тестами без оборудования.
-- Локальные состояние дисплеев, блокировки, личные диагностические записи и Python-кэш исключены из Git. Документация не содержит идентификаторов реального оборудования или личных путей.
+- Translated CLI output, errors, help, test expectations, documentation, and the pull request template into English without changing display-control behavior.
+- Documented that scripts run directly from the checkout: updating files updates the local installation without a separate build or reinstall.
+- Updated contributor and agent instructions to require English for all tracked text.
 
-### Один экран и синхронизация после on — 2026-11-08
+### Repository preparation — 2026-11-09
 
-- status/half/max/toggle работают при единственном MacBook, не вызывая DDC для отсутствующего внешнего экрана.
-- После on и восстановления координат внешний экран получает текущую яркость MacBook без toggle и без изменения MacBook. Повторный on повторяет синхронизацию, не переподключая активный экран.
-- Синхронизация подключена к обычному on/toggle и аварийному восстановлению. Добавлена ручная команда brightness.py sync, общая блокировка и до трёх попыток готовности DDC.
-- Для яркости CGDisplayIsOnline отличает доступный спящий экран от программно отключённого: displayplacer Enabled может стать false во время сна.
-- 34 unit-теста: 12 для яркости и 22 для подключения/расположения.
-- На оборудовании проверено переключение одного MacBook до 100% и обратно 50%. Отдельный реальный цикл синхронизации при возврате внешнего экрана ещё не подтверждён; mock-проверки этого пути проходят.
+- Added a README for a fresh checkout on another Mac: installation, initialization, CLI, keyboard shortcuts, troubleshooting, and limitations.
+- Added contributor and agent instructions, architecture documentation, and hardware-test safety rules.
+- Added the MIT License, security-reporting information, a pull request template, and hardware-free CI.
+- Excluded local display state, locks, personal diagnostic notes, and Python caches from Git. Documentation contains no real hardware identifiers or personal paths.
 
-### Первоначальная реализация — 2026-11-08
+### Single-display support and post-on synchronization — 2026-11-08
 
-- CLI для подключения внешнего дисплея, безопасного выбора по UUID и восстановления расположения.
-- displayplacer оставлен только для обнаружения: его первоначальное отключение не позволило надёжно включить монитор обратно. Изменения подключения переведены на прямой macOS API.
-- Состояние и координаты сохраняются до off; on проверяется повторным чтением. Отдельный recovery инструмент только включает дисплеи.
-- Аппаратная яркость через DisplayServices для MacBook и m1ddc/DDC для внешнего экрана; 50%/100%, порог toggle 75%, нормализация по максимуму DDC, проверка результата и откат.
-- Интеграция с «Командами»: рекомендуемые ⌃⌥⌘M и ⌃⌥⌘B.
-- На MacBook Pro M1 Pro + LG 27UL850-W через USB-C проверены off/on, восстановление координат, цикл яркости двух экранов 100% → 50% → 100% и вызов яркости горячей клавишей из Finder.
+- status/half/max/toggle work with only the MacBook, without sending DDC requests to an absent external display.
+- After on and coordinate restoration, the external display receives current MacBook brightness without toggling or changing the MacBook. Repeated on retries synchronization without reconnecting an active display.
+- Synchronization is wired into normal on/toggle and emergency recovery. Added brightness.py sync, a shared lock, and up to three DDC-readiness attempts.
+- Brightness discovery uses CGDisplayIsOnline to distinguish an available sleeping display from a software-disconnected one: displayplacer Enabled may become false during sleep.
+- 34 unit tests: 12 brightness tests and 22 connection/layout tests.
+- Hardware validation covered the MacBook alone changing to 100% and back to 50%. A separate real cycle of post-return external brightness synchronization has not been confirmed; mock checks pass.
+
+### Initial implementation — 2026-11-08
+
+- Added an external-display CLI with UUID-based selection and layout restoration.
+- Kept displayplacer for discovery only: its original disconnection path did not reliably enable the monitor again. Connection changes now use a direct macOS API.
+- State and coordinates are saved before off; on is verified using fresh reads. A separate recovery tool only enables displays.
+- Added hardware brightness through DisplayServices for MacBook and m1ddc/DDC for the external display: 50%/100%, a 75% toggle threshold, normalization using the DDC maximum, result verification, and rollback.
+- Added Shortcuts integration with suggested ⌃⌥⌘M and ⌃⌥⌘B combinations.
+- On a MacBook Pro M1 Pro + LG 27UL850-W over USB-C, validated off/on, coordinate restoration, a two-display 100% → 50% → 100% brightness cycle, and brightness invocation from Finder using the keyboard shortcut.

@@ -18,27 +18,27 @@ def record_recovery(saved, active):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Только включение дисплеев; без --apply изменений нет.')
-    parser.add_argument('--all', action='store_true', help='Пробовать номера 1–10; может включить другие отключённые экраны')
+    parser = argparse.ArgumentParser(description='Enable displays only; no changes without --apply.')
+    parser.add_argument('--all', action='store_true', help='Try IDs 1–10; may enable other disabled displays')
     parser.add_argument('--apply', action='store_true')
     args = parser.parse_args()
     saved = json.loads(STATE.read_text()) if STATE.exists() else {}
     target = saved.get('id')
     if not target:
-        raise RuntimeError('Нет сохранённого дисплея.')
+        raise RuntimeError('No saved display is available.')
     screens = read_screens()
     if not screens:
-        raise RuntimeError('Список экранов пуст: запусти из обычного Terminal.')
+        raise RuntimeError('The display list is empty: run from a regular Terminal.')
     active = next((s for s in screens if s['id'] == target and s['enabled']), None)
     if active:
         if args.apply:
             detail = record_recovery(saved, active)
         else:
             detail = ''
-        print('LG уже активен в macOS. Запросы включения не отправлялись.' + detail)
+        print('LG is already active in macOS. No enable requests were sent.' + detail)
         return
     if not args.apply:
-        print('Режим проверки: LG не активен. Изменений нет. Для восстановления используй --apply; --all разрешает перебор номеров 1–10.')
+        print('Diagnostic mode: LG is not active. No changes were made. Use --apply to recover; --all permits trying IDs 1–10.')
         return
     api = DisplayAPI()
     if not args.all:
@@ -61,9 +61,9 @@ def main():
             active = next((s for s in current if s['id'] == target and s['enabled']), None)
             if active:
                 restored = record_recovery(saved, active)
-                print('LG снова активен в macOS.' + restored + ' Проверь изображение.')
+                print('LG is active in macOS again.' + restored + ' Check the image.')
                 return
-    raise RuntimeError('LG не появился среди активных. ' + '; '.join(errors) + '\nСохрани работу и перезагрузи Mac; автоматическая перезагрузка не выполняется.')
+    raise RuntimeError('LG did not appear among active displays. ' + '; '.join(errors) + '\nSave your work and restart the Mac; no automatic restart will be performed.')
 
 
 if __name__ == '__main__':

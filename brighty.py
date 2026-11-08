@@ -23,7 +23,7 @@ def displays(output):
         enabled = re.search(r'^Enabled:\s*(true|false)\s*$', block, re.M)
         origin = re.search(r'^Origin:\s*\((-?\d+),\s*(-?\d+)\)', block, re.M)
         if not number or not kind or not enabled:
-            raise RuntimeError('Неполный ответ displayplacer: переключение отменено.')
+            raise RuntimeError('Incomplete displayplacer response: switching canceled.')
         result.append({'id': uid[1], 'system_id': int(number[1]),
                        'origin': [int(origin[1]), int(origin[2])] if origin else None,
                        'builtin': bool(re.search(r'built.in|internal', kind[1], re.I)),
@@ -45,16 +45,16 @@ class Controller:
             try:
                 restored += self.after_on(state['id']) or ''
             except (RuntimeError, OSError, ValueError, AttributeError, subprocess.TimeoutExpired) as error:
-                raise RuntimeError('Экран включён в macOS, но яркость не синхронизирована. '
-                                   f'{error} Повтори on для синхронизации без отключения.') from error
+                raise RuntimeError('The display is enabled in macOS, but brightness was not synchronized. '
+                                   f'{error} Run on again to synchronize without disconnecting.') from error
         return restored
 
     def capture_layout(self, screens):
         layout = {s['id']: s.get('origin') for s in screens if s['enabled']}
         if any(not isinstance(p, list) or len(p) != 2 for p in layout.values()):
-            raise RuntimeError('Не удалось прочитать координаты экранов; отключение отменено.')
+            raise RuntimeError('Could not read display coordinates; disconnection canceled.')
         if len({tuple(p) for p in layout.values()}) != len(layout):
-            raise RuntimeError('Сохранение расположения поддерживает расширенный рабочий стол, без зеркалирования.')
+            raise RuntimeError('Layout saving supports an extended desktop only, without mirroring.')
         return layout
 
     def restore_layout(self, state):
@@ -63,13 +63,13 @@ class Controller:
         layout = state.get('layout')
         current = {s['id']: s for s in self.read() if s['enabled']}
         if not layout or set(current) != set(layout):
-            raise RuntimeError('Экран включён, но состав дисплеев изменился: расположение не восстановлено. Сохранённая схема оставлена для повторного on.')
+            raise RuntimeError('The display is enabled, but the set of displays changed: layout was not restored. The saved layout was kept for another on attempt.')
         def matches():
             observed = {s['id']: s.get('origin') for s in self.read() if s['enabled']}
             return observed == layout
         if not matches():
             if self.set_origins is None:
-                raise RuntimeError('Нет обработчика восстановления расположения.')
+                raise RuntimeError('No layout restoration handler is available.')
             positions = [(current[uid]['system_id'], *point) for uid, point in layout.items()]
             positions.sort(key=lambda item: (item[1:3] != (0, 0)))
             self.set_origins(positions)
@@ -78,10 +78,10 @@ class Controller:
                     break
                 self.pause(0.3)
             else:
-                raise RuntimeError('Экран включён, но координаты не совпали с сохранёнными. Повтори on; схема сохранена.')
+                raise RuntimeError('The display is enabled, but coordinates do not match the saved layout. Run on again; the layout was kept.')
         state['layout_pending'] = False
         self.save(state)
-        return ' Расположение экранов восстановлено.'
+        return ' Display layout restored.'
 
     def save(self, state):
         temporary = self.path.with_suffix('.tmp')
@@ -102,26 +102,26 @@ class Controller:
     def act(self, action, requested=None):
         screens = self.read()
         if not screens:
-            raise RuntimeError('macOS не вернула список экранов. Запусти из обычного Terminal в текущем сеансе macOS.')
+            raise RuntimeError('macOS did not return a display list. Run from a regular Terminal in the current macOS session.')
         saved = json.loads(self.path.read_text()) if self.path.exists() else {}
         target = requested or saved.get('id')
         if not target:
             external = [s for s in screens if s['external']]
             if len(external) != 1:
-                raise RuntimeError('Нужен ровно один внешний экран либо --id из list.')
+                raise RuntimeError('Exactly one external display or an explicit --id from list is required.')
             target = external[0]['id']
         screen = next((s for s in screens if s['id'] == target), None)
         if screen and not screen['external']:
-            raise RuntimeError('Управлять встроенным экраном запрещено.')
+            raise RuntimeError('Controlling the built-in display is not allowed.')
         active = bool(screen and screen['enabled'])
         if action == 'save-layout':
             if not active:
-                raise RuntimeError('Для сохранения расположения внешний экран должен быть активен.')
+                raise RuntimeError('The external display must be active to save the layout.')
             self.save({'id': target, 'system_id': screen['system_id'], 'disabled': False,
                        'layout': self.capture_layout(screens), 'layout_pending': False})
-            return 'Текущее расположение экранов сохранено.'
+            return 'Current display layout saved.'
         if action == 'status':
-            return 'Внешний экран активен в macOS.' if active else 'Внешний экран отсутствует среди активных; он может быть отключён или отсоединён.'
+            return 'The external display is active in macOS.' if active else 'The external display is not active; it may be disabled or unplugged.'
         if action == 'toggle':
             action = 'off' if active else 'on'
         # Idempotency comes BEFORE any display mutation, including fallback.
@@ -130,12 +130,12 @@ class Controller:
             state.update(id=target, system_id=screen['system_id'], disabled=False)
             self.save(state)
             restored = self.finish_on(state)
-            return 'Внешний экран уже включён в macOS.' + (restored or ' Ничего переключать не потребовалось.')
+            return 'The external display is already enabled in macOS.' + (restored or ' No connection change was needed.')
         if action == 'off' and not active:
-            return 'Внешний экран уже отсутствует среди активных. Ничего не изменено.'
+            return 'The external display is already absent from the active list. Nothing was changed.'
         if action == 'off':
             if not any(s['builtin'] and s['enabled'] for s in screens):
-                raise RuntimeError('Открой крышку MacBook: нужен активный встроенный экран.')
+                raise RuntimeError('Open the MacBook lid: an active built-in display is required.')
             # Keep the numeric ID BEFORE the display disappears from discovery.
             state = {'id': target, 'system_id': screen['system_id'], 'disabled': True,
                      'layout': self.capture_layout(screens), 'layout_pending': True}
@@ -144,10 +144,10 @@ class Controller:
         else:
             number = screen['system_id'] if screen else saved.get('system_id')
             if not number or (not screen and saved.get('id') != target):
-                raise RuntimeError('Нет сохранённого системного номера для включения. Используй recover_display.py --all --apply либо перезагрузку после сохранения работы.')
+                raise RuntimeError('No saved system display ID is available for enabling. Use recover_display.py --all --apply or save your work and restart.')
             # Never use a stale number now belonging to a different online display.
             if any(s['system_id'] == number and s['id'] != target for s in screens):
-                raise RuntimeError('Системный номер сменился. Автоматическое включение отменено; используй восстановление.')
+                raise RuntimeError('The system display ID changed. Automatic enabling was canceled; use recovery.')
             state = dict(saved)
             state.update(id=target, system_id=number, disabled=True)
         error = None
@@ -160,21 +160,21 @@ class Controller:
             state['disabled'] = action == 'off'
             self.save(state)
             restored = self.finish_on(state) if action == 'on' else ''
-            return ('Внешний экран отключён в macOS. Вернуть: python3 brighty.py on' if action == 'off'
-                    else 'Внешний экран активен в macOS.' + restored + ' Проверь изображение на LG.')
+            return ('The external display is disabled in macOS. Restore with: python3 brighty.py on' if action == 'off'
+                    else 'The external display is active in macOS.' + restored + ' Check the image on LG.')
         detail = f' {error}' if error else ''
         if action == 'off':
-            raise RuntimeError('Отключение не подтверждено.' + detail + ' Сохранён номер для on.')
-        raise RuntimeError('Включение не подтверждено.' + detail + ' Проверь кабель; для восстановления: python3 recover_display.py --all --apply')
+            raise RuntimeError('Disconnection was not confirmed.' + detail + ' The display ID was saved for on.')
+        raise RuntimeError('Enabling was not confirmed.' + detail + ' Check the cable; recover with: python3 recover_display.py --all --apply')
 
 
 def read_screens():
     binary = shutil.which('displayplacer')
     if not binary:
-        raise RuntimeError('Нужен displayplacer: brew install displayplacer')
+        raise RuntimeError('displayplacer is required: brew install displayplacer')
     process = subprocess.run([binary, 'list'], text=True, capture_output=True, timeout=15)
     if process.returncode:
-        raise RuntimeError(process.stderr.strip() or 'Не удалось прочитать экраны.')
+        raise RuntimeError(process.stderr.strip() or 'Could not read displays.')
     return displays(process.stdout)
 
 
@@ -185,16 +185,16 @@ def sync_brightness_after_on(target):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Переключатель внешнего дисплея. Питание USB-C не отключается.')
+    parser = argparse.ArgumentParser(description='External display connection toggle. USB-C power is not disconnected.')
     parser.add_argument('action', choices=['list', 'status', 'off', 'on', 'toggle', 'save-layout'])
-    parser.add_argument('--id', help='Persistent screen id внешнего дисплея')
+    parser.add_argument('--id', help='Persistent screen ID of the external display')
     args = parser.parse_args()
     if args.action == 'list':
         screens = read_screens()
         if not screens:
-            raise RuntimeError('Список пуст: запусти из обычного Terminal в текущем сеансе macOS.')
+            raise RuntimeError('The display list is empty: run from a regular Terminal in the current macOS session.')
         for screen in screens:
-            print(f"{'MacBook' if screen['builtin'] else 'Внешний'}: {screen['id']}, системный номер {screen['system_id']}, активен: {screen['enabled']}, координаты: {screen['origin']}")
+            print(f"{'MacBook' if screen['builtin'] else 'External'}: {screen['id']}, system ID {screen['system_id']}, active: {screen['enabled']}, coordinates: {screen['origin']}")
         return
     from display_api import DisplayAPI
     # Load the private API only when a change is actually required.
