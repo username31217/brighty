@@ -1,0 +1,28 @@
+# Machine-specific display identity, layout, and runtime locks
+.brighty-state.json
+.brighty-state.tmp
+.brightness.lock
+.local-notes/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local configuration, credentials, and editor files
+.env
+.env.*
+!.env.example
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*.log
