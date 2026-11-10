@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fewer intermittent Shortcuts errors — 2026-11-10
+
+- Repeated a failed or malformed m1ddc request up to 3 times with 0.3-second pauses before failing a brightness command; timeouts are not repeated.
+- Extended post-on brightness synchronization from 3 attempts with 0.5-second pauses to 8 attempts with 1-second pauses. Shortcuts logs showed on and an immediate brightness toggle failing while DDC was not yet ready, then succeeding a few seconds later.
+- Added a local `.brighty.log` (ignored by Git) recording each CLI run's outcome and duration, because Shortcuts only shows a generic error and the system log redacts the script's message. `list` output is not recorded.
+- 42 unit tests. Validated with mocks and read-only commands only; the retries have not yet been observed on hardware.
+
 ### English-only interface and documentation — 2026-11-09
 
 - Translated CLI output, errors, help, test expectations, documentation, and the pull request template into English without changing display-control behavior.

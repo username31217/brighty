@@ -1,8 +1,9 @@
 import unittest
 from unittest.mock import patch
+import subprocess
 from contextlib import nullcontext
 
-from brightness import apply, target_level, External, devices_for_screens, sync_external
+from brightness import apply, target_level, External, devices_for_screens, sync_external, SYNC_ATTEMPTS
 
 BUILTIN = dict(id='internal', system_id=1, builtin=True, external=False)
 LG = dict(id='lg', system_id=3, builtin=False, external=True)
@@ -106,6 +107,44 @@ class BrightnessTests(unittest.TestCase):
             command.assert_called_with('set', 'luminance', 128)
         self.assertEqual(device.quantize(0.5), 128 / 255)
 
+    def test_transient_ddc_failure_is_retried(self):
+        device = External.__new__(External)
+        device.uid = 'lg'
+        replies = [subprocess.CompletedProcess([], 1, '', 'DDC busy'),
+                   subprocess.CompletedProcess([], 0, 'garbage', ''),
+                   subprocess.CompletedProcess([], 0, '42\n', '')]
+        with patch('brightness.subprocess.run', side_effect=replies) as run, patch('brightness.time.sleep'):
+            self.assertEqual(device.command('get', 'luminance'), 42)
+        self.assertEqual(run.call_count, 3)
+
+    def test_persistent_ddc_failure_reports_last_error(self):
+        device = External.__new__(External)
+        device.uid = 'lg'
+        failure = subprocess.CompletedProcess([], 1, '', 'DDC busy')
+        with patch('brightness.subprocess.run', return_value=failure) as run, patch('brightness.time.sleep'):
+            with self.assertRaisesRegex(RuntimeError, 'DDC busy.*3 attempts'):
+                device.command('set', 'luminance', 50)
+        self.assertEqual(run.call_count, 3)
+
+    def test_sync_waits_several_seconds_for_ddc_after_on(self):
+        devices = {'MacBook': Device(0.5), 'LG': Device(1)}
+        waking = [RuntimeError('DDC waking')] * (SYNC_ATTEMPTS - 1)
+        with patch('brightness.brightness_lock', return_value=nullcontext()), \
+             patch('brightness.available_screens', return_value=[BUILTIN, LG]), \
+             patch('brightness.devices_for_screens', side_effect=waking + [devices]), \
+             patch('brightness.time.sleep') as sleep:
+            sync_external('lg')
+        self.assertEqual(devices['LG'].get(), 0.5)
+        self.assertGreaterEqual(sum(call.args[0] for call in sleep.call_args_list), 5)
+
+    def test_sync_gives_up_after_bounded_attempts(self):
+        with patch('brightness.brightness_lock', return_value=nullcontext()), \
+             patch('brightness.available_screens', return_value=[BUILTIN, LG]), \
+             patch('brightness.devices_for_screens', side_effect=RuntimeError('DDC down')) as devices, \
+             patch('brightness.time.sleep'):
+            with self.assertRaisesRegex(RuntimeError, 'DDC down'):
+                sync_external('lg')
+        self.assertEqual(devices.call_count, SYNC_ATTEMPTS)
 
 if __name__ == '__main__':
     unittest.main()

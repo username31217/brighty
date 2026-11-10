@@ -23,7 +23,7 @@ Run safe verification with `python3 -m unittest discover -v` and `git diff --che
 
 Do not run off/on/toggle/half/max/sync or recovery --apply without authorization to affect the user's displays. Never leave a display disconnected after a hardware test that disconnected it. Preserve the starting layout and record exactly what was verified. Read-only list/status are diagnostics, but their output contains machine identifiers: do not publish raw output.
 
-Never stage .brighty-state.json, .brighty-state.tmp, .brightness.lock, .local-notes/, caches, credentials, or personal system settings. Do not commit real display UUIDs, serials, or absolute home-directory paths in docs or fixtures. Do not remove ignored local state while preparing a release.
+Never stage .brighty-state.json, .brighty-state.tmp, .brightness.lock, .brighty.log, .local-notes/, caches, credentials, or personal system settings. Do not commit real display UUIDs, serials, or absolute home-directory paths in docs or fixtures. Do not remove ignored local state while preparing a release.
 
 ## Scope and handoff
 

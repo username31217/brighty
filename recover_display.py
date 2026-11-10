@@ -2,7 +2,6 @@
 """Explicit recovery for older state files lacking a saved numeric ID."""
 import argparse
 import json
-import sys
 import time
 from brighty import STATE, Controller, read_screens, sync_brightness_after_on
 from display_api import DisplayAPI
@@ -35,16 +34,13 @@ def main():
             detail = record_recovery(saved, active)
         else:
             detail = ''
-        print('LG is already active in macOS. No enable requests were sent.' + detail)
-        return
+        return 'LG is already active in macOS. No enable requests were sent.' + detail
     if not args.apply:
-        print('Diagnostic mode: LG is not active. No changes were made. Use --apply to recover; --all permits trying IDs 1–10.')
-        return
+        return 'Diagnostic mode: LG is not active. No changes were made. Use --apply to recover; --all permits trying IDs 1–10.'
     api = DisplayAPI()
     if not args.all:
-        print(Controller(read_screens, api.set_enabled, set_origins=api.set_origins,
-                         after_on=sync_brightness_after_on).act('on'))
-        return
+        return Controller(read_screens, api.set_enabled, set_origins=api.set_origins,
+                          after_on=sync_brightness_after_on).act('on')
     online = {s['system_id'] for s in screens if s['enabled']}
     errors = []
     for number in range(1, 11):
@@ -61,13 +57,11 @@ def main():
             active = next((s for s in current if s['id'] == target and s['enabled']), None)
             if active:
                 restored = record_recovery(saved, active)
-                print('LG is active in macOS again.' + restored + ' Check the image.')
-                return
+                return 'LG is active in macOS again.' + restored + ' Check the image.'
     raise RuntimeError('LG did not appear among active displays. ' + '; '.join(errors) + '\nSave your work and restart the Mac; no automatic restart will be performed.')
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except (RuntimeError, OSError, ValueError, AttributeError) as error:
-        sys.exit(str(error))
+    import subprocess
+    from runlog import run
+    run('recover_display', main, (RuntimeError, OSError, ValueError, AttributeError, subprocess.TimeoutExpired))

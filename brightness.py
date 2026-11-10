@@ -9,13 +9,19 @@ import json
 import math
 from pathlib import Path
 import subprocess
-import sys
 import time
 
 from brighty import read_screens, STATE
 
 ROOT = Path(__file__).resolve().parent
 DDC = '/opt/homebrew/bin/m1ddc'
+# A single DDC/CI request occasionally fails, notably right after a write or
+# while the monitor wakes; repeat it a few times before failing the command.
+DDC_ATTEMPTS = 3
+DDC_RETRY_PAUSE = 0.3
+# After on, the monitor needs several seconds before it answers DDC requests.
+SYNC_ATTEMPTS = 8
+SYNC_RETRY_PAUSE = 1.0
 
 
 def target_level(current):
@@ -59,16 +65,22 @@ class External:
             raise RuntimeError('DDC returned an invalid maximum brightness.')
 
     def command(self, *args):
-        process = subprocess.run([DDC, 'display', self.uid, *map(str, args)],
-                                 text=True, capture_output=True, timeout=8)
-        if process.returncode:
-            raise RuntimeError(f'DDC LG: {(process.stderr or process.stdout).strip()}')
-        if args[0] == 'set':
-            return
-        try:
-            return int(process.stdout.strip())
-        except ValueError:
-            raise RuntimeError(f'Invalid DDC response: {process.stdout.strip()!r}') from None
+        # Timeouts are not retried: each one already costs 8 seconds.
+        for attempt in range(DDC_ATTEMPTS):
+            if attempt:
+                time.sleep(DDC_RETRY_PAUSE)
+            process = subprocess.run([DDC, 'display', self.uid, *map(str, args)],
+                                     text=True, capture_output=True, timeout=8)
+            if process.returncode:
+                error = f'DDC LG: {(process.stderr or process.stdout).strip()}'
+                continue
+            if args[0] == 'set':
+                return
+            try:
+                return int(process.stdout.strip())
+            except ValueError:
+                error = f'Invalid DDC response: {process.stdout.strip()!r}'
+        raise RuntimeError(f'{error} ({DDC_ATTEMPTS} attempts)')
 
     def get(self):
         raw = self.command('get', 'luminance')
@@ -175,7 +187,7 @@ def brightness_lock(wait=0):
 def sync_external(target=None):
     """After on, copy the MacBook's live brightness to LG without toggling."""
     with brightness_lock(wait=5):
-        for attempt in range(3):
+        for attempt in range(SYNC_ATTEMPTS):
             try:
                 screens = available_screens()
                 devices = devices_for_screens(screens, target)
@@ -187,9 +199,9 @@ def sync_external(target=None):
                 apply({'LG': devices['LG']}, level)
                 return f' LG brightness synchronized with MacBook: {level:.1%}.'
             except (RuntimeError, OSError, subprocess.TimeoutExpired):
-                if attempt == 2:
+                if attempt == SYNC_ATTEMPTS - 1:
                     raise
-                time.sleep(0.5)
+                time.sleep(SYNC_RETRY_PAUSE)
 
 
 def main():
@@ -197,23 +209,19 @@ def main():
     parser.add_argument('action', choices=['status', 'half', 'max', 'toggle', 'sync'])
     args = parser.parse_args()
     if args.action == 'sync':
-        print(sync_external().strip())
-        return
+        return sync_external().strip()
     # Nonblocking process lock: repeated hotkeys never queue extra toggles.
     with brightness_lock():
         devices, main_name = connect()
         current = {name: device.get() for name, device in devices.items()}
         if args.action == 'status':
-            print(json.dumps({'main': main_name, 'brightness': current}, ensure_ascii=False))
-            return
+            return json.dumps({'main': main_name, 'brightness': current}, ensure_ascii=False)
         level = target_level(current[main_name]) if args.action == 'toggle' else {'half': 0.5, 'max': 1.0}[args.action]
         result = apply(devices, level)
-        print(f'Main display: {main_name}, previously {current[main_name]:.1%}. '
-              + ' '.join(f'{name}: {value:.1%}.' for name, value in result.items()))
+        return (f'Main display: {main_name}, previously {current[main_name]:.1%}. '
+                + ' '.join(f'{name}: {value:.1%}.' for name, value in result.items()))
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except (RuntimeError, OSError, ValueError, AttributeError, subprocess.TimeoutExpired) as error:
-        sys.exit(str(error))
+    from runlog import run
+    run('brightness', main, (RuntimeError, OSError, ValueError, AttributeError, subprocess.TimeoutExpired))

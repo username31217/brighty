@@ -119,6 +119,12 @@ If the external display does not return:
 python3 brighty.py on
 ```
 
+Every run of `brighty.py`, `brightness.py`, and `recover_display.py` appends one line with its outcome and duration to `.brighty.log` next to the scripts. The file is ignored by Git, trimmed automatically, and omits `list` output. Use it to see why a keyboard shortcut failed:
+
+```sh
+tail -n 20 .brighty.log
+```
+
 If the saved numeric ID is missing or stale, a separate recovery command can attempt enabling displays:
 
 ```sh
@@ -137,6 +143,7 @@ The last command may enable other disabled displays. It is not intended for ordi
 | Display enabled but brightness not copied | Retry `brighty.py on` or `brightness.py sync` once DDC is ready |
 | Coordinates not restored | The display set must match the saved layout; retry `on` |
 | Keyboard shortcut does not work | Check Run, absolute paths, Allow Running Scripts, and shortcut conflicts |
+| Shortcuts shows "an error occurred while running the script" | Read the last lines of `.brighty.log` in the checkout: Shortcuts hides the script's error text from the system log |
 
 ## Limitations and validation status
 
@@ -154,7 +161,7 @@ The last command may enable other disabled displays. It is not intended for ordi
 python3 -m unittest discover -v
 ```
 
-**34 tests** use fake devices and do not change real displays. They require neither Homebrew utilities nor macOS frameworks and can run on Linux or macOS. GitHub Actions runs these checks on Python 3.10 and 3.14. Real hardware checks are separate and require explicit authorization.
+**42 tests** use fake devices and do not change real displays. They require neither Homebrew utilities nor macOS frameworks and can run on Linux or macOS. GitHub Actions runs these checks on Python 3.10 and 3.14. Real hardware checks are separate and require explicit authorization.
 
 - [Architecture and invariants](ARCHITECTURE.md)
 - [Contributing and adapting to another Mac](CONTRIBUTING.md)

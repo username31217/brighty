@@ -2,6 +2,7 @@
 .brighty-state.json
 .brighty-state.tmp
 .brightness.lock
+.brighty.log
 .local-notes/
 
 # Python

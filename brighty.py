@@ -6,7 +6,6 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-import sys
 import time
 
 STATE = Path(__file__).resolve().with_name('.brighty-state.json')
@@ -193,21 +192,18 @@ def main():
         screens = read_screens()
         if not screens:
             raise RuntimeError('The display list is empty: run from a regular Terminal in the current macOS session.')
-        for screen in screens:
-            print(f"{'MacBook' if screen['builtin'] else 'External'}: {screen['id']}, system ID {screen['system_id']}, active: {screen['enabled']}, coordinates: {screen['origin']}")
-        return
+        return '\n'.join(f"{'MacBook' if screen['builtin'] else 'External'}: {screen['id']}, system ID {screen['system_id']}, active: {screen['enabled']}, coordinates: {screen['origin']}"
+                         for screen in screens)
     from display_api import DisplayAPI
     # Load the private API only when a change is actually required.
     def change(number, enabled):
         DisplayAPI().set_enabled(number, enabled)
     def position(items):
         DisplayAPI().set_origins(items)
-    print(Controller(read_screens, change, set_origins=position,
-                     after_on=sync_brightness_after_on).act(args.action, args.id))
+    return Controller(read_screens, change, set_origins=position,
+                      after_on=sync_brightness_after_on).act(args.action, args.id)
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except (RuntimeError, OSError, ValueError, AttributeError, subprocess.TimeoutExpired) as error:
-        sys.exit(str(error))
+    from runlog import run
+    run('brighty', main, (RuntimeError, OSError, ValueError, AttributeError, subprocess.TimeoutExpired))
