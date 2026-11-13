@@ -9,6 +9,9 @@ import subprocess
 import time
 
 STATE = Path(__file__).resolve().with_name('.brighty-state.json')
+# Enabling sometimes fails with macOS code 1001 while the monitor wakes up.
+ENABLE_ATTEMPTS = 3
+ENABLE_RETRY_PAUSE = 1.0
 
 
 def displays(output):
@@ -37,6 +40,8 @@ class Controller:
         self.attempts, self.pause = attempts, pause
         self.set_origins = set_origins
         self.after_on = after_on
+        # What act() did, for short notifications: off, on, already-on, ...
+        self.event = None
 
     def finish_on(self, state):
         restored = self.restore_layout(state)
@@ -60,7 +65,13 @@ class Controller:
         if not state.get('layout_pending'):
             return ''
         layout = state.get('layout')
-        current = {s['id']: s for s in self.read() if s['enabled']}
+        # Discovery can briefly miss a display right after enabling; poll it.
+        for attempt in range(self.attempts):
+            current = {s['id']: s for s in self.read() if s['enabled']}
+            if layout and set(current) == set(layout):
+                break
+            if attempt < self.attempts - 1:
+                self.pause(0.3)
         if not layout or set(current) != set(layout):
             raise RuntimeError('The display is enabled, but the set of displays changed: layout was not restored. The saved layout was kept for another on attempt.')
         def matches():
@@ -118,6 +129,7 @@ class Controller:
                 raise RuntimeError('The external display must be active to save the layout.')
             self.save({'id': target, 'system_id': screen['system_id'], 'disabled': False,
                        'layout': self.capture_layout(screens), 'layout_pending': False})
+            self.event = 'saved'
             return 'Current display layout saved.'
         if action == 'status':
             return 'The external display is active in macOS.' if active else 'The external display is not active; it may be disabled or unplugged.'
@@ -129,8 +141,10 @@ class Controller:
             state.update(id=target, system_id=screen['system_id'], disabled=False)
             self.save(state)
             restored = self.finish_on(state)
+            self.event = 'already-on'
             return 'The external display is already enabled in macOS.' + (restored or ' No connection change was needed.')
         if action == 'off' and not active:
+            self.event = 'already-off'
             return 'The external display is already absent from the active list. Nothing was changed.'
         if action == 'off':
             if not any(s['builtin'] and s['enabled'] for s in screens):
@@ -149,13 +163,20 @@ class Controller:
                 raise RuntimeError('The system display ID changed. Automatic enabling was canceled; use recovery.')
             state = dict(saved)
             state.update(id=target, system_id=number, disabled=True)
-        error = None
-        try:
-            self.set_enabled(number, action == 'on')
-        except RuntimeError as exc:
-            error = exc
-        confirmed = self.wait_for(target, action == 'on')
+        # Bounded retry for on only; off is never repeated automatically.
+        for attempt in range(ENABLE_ATTEMPTS if action == 'on' else 1):
+            if attempt:
+                self.pause(ENABLE_RETRY_PAUSE)
+            error = None
+            try:
+                self.set_enabled(number, action == 'on')
+            except RuntimeError as exc:
+                error = exc
+            confirmed = self.wait_for(target, action == 'on')
+            if confirmed:
+                break
         if confirmed:
+            self.event = action
             state['disabled'] = action == 'off'
             self.save(state)
             restored = self.finish_on(state) if action == 'on' else ''
@@ -200,9 +221,30 @@ def main():
         DisplayAPI().set_enabled(number, enabled)
     def position(items):
         DisplayAPI().set_origins(items)
-    return Controller(read_screens, change, set_origins=position,
-                      after_on=sync_brightness_after_on).act(args.action, args.id)
+    controller = Controller(read_screens, change, set_origins=position, after_on=sync_brightness_after_on)
+    text = controller.act(args.action, args.id)
+    return notification(controller.event, text)
 
+
+def notification(event, text):
+    """Short notification for what act() did; the CLI text stays unchanged."""
+    from runlog import Report
+    details = []
+    if 'Display layout restored.' in text:
+        details.append('Layout restored.')
+    synced = re.search(r'synchronized with MacBook: ([\d.]+%)', text)
+    if synced:
+        details.append(f'LG brightness set to {synced[1]} to match the MacBook.')
+    if 'left unchanged' in text:
+        details.append('LG brightness unchanged: MacBook is not available.')
+    detail = ' '.join(details)
+    titles = {'off': ('External display off', 'Only the MacBook screen is active. Press the shortcut again to turn it back on.'),
+              'on': ('External display on', detail or 'The external display is active.'),
+              'already-on': ('External display already on', detail or 'No connection change was needed.'),
+              'already-off': ('External display already off', 'Nothing was changed.'),
+              'saved': ('Display layout saved', 'The current positions will be restored after on.')}
+    title, body = titles.get(event, ('Brighty', text))
+    return Report(text, title, body)
 
 if __name__ == '__main__':
     from runlog import run

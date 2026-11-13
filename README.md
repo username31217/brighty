@@ -119,6 +119,10 @@ If the external display does not return:
 python3 brighty.py on
 ```
 
+### Notifications
+
+Every display or brightness change raises a macOS notification describing what happened, for example **Brightness 50%** — "LG 50%, MacBook 50%", **External display on** — "Layout restored. LG brightness set to 50.0% to match the MacBook.", or **External display off**. Failures raise a **Brighty error** notification with the error text; when started from Shortcuts, Shortcuts also shows its own script-error notification. Read-only `list` and `status` do not notify. Set `BRIGHTY_NOTIFY=0` to disable notifications, for example in scripts. Notifications use `osascript` and appear only if macOS allows notifications for it.
+
 Every run of `brighty.py`, `brightness.py`, and `recover_display.py` appends one line with its outcome and duration to `.brighty.log` next to the scripts. The file is ignored by Git, trimmed automatically, and omits `list` output. Use it to see why a keyboard shortcut failed:
 
 ```sh
@@ -143,7 +147,7 @@ The last command may enable other disabled displays. It is not intended for ordi
 | Display enabled but brightness not copied | Retry `brighty.py on` or `brightness.py sync` once DDC is ready |
 | Coordinates not restored | The display set must match the saved layout; retry `on` |
 | Keyboard shortcut does not work | Check Run, absolute paths, Allow Running Scripts, and shortcut conflicts |
-| Shortcuts shows "an error occurred while running the script" | Read the last lines of `.brighty.log` in the checkout: Shortcuts hides the script's error text from the system log |
+| Shortcuts shows "an error occurred while running the script" | A "Brighty error" notification carries the same text; the last lines of `.brighty.log` keep it. Shortcuts hides the script's error text from the system log |
 
 ## Limitations and validation status
 
@@ -161,7 +165,7 @@ The last command may enable other disabled displays. It is not intended for ordi
 python3 -m unittest discover -v
 ```
 
-**42 tests** use fake devices and do not change real displays. They require neither Homebrew utilities nor macOS frameworks and can run on Linux or macOS. GitHub Actions runs these checks on Python 3.10 and 3.14. Real hardware checks are separate and require explicit authorization.
+**55 tests** use fake devices and do not change real displays. They require neither Homebrew utilities nor macOS frameworks and can run on Linux or macOS. GitHub Actions runs these checks on Python 3.10 and 3.14. Real hardware checks are separate and require explicit authorization.
 
 - [Architecture and invariants](ARCHITECTURE.md)
 - [Contributing and adapting to another Mac](CONTRIBUTING.md)

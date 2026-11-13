@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Notifications and remaining intermittent errors — 2026-11-13
+
+- Every display or brightness change now raises a short macOS notification (for example "Brightness 50%: LG 50%, MacBook 50%" or "External display on"), and every failure raises a "Brighty error" notification with the error text. `list` and `status` stay silent; `BRIGHTY_NOTIFY=0` disables notifications.
+- The local run log showed that the most frequent remaining failure was "DDC returned an out-of-range brightness value": the tested LG occasionally answers 8224 (0x2020) instead of a real value. The DDC maximum now needs two equal consecutive reads, and out-of-range current values are re-read.
+- Enabling the external display is retried up to 3 times after macOS code 1001; disabling is never repeated automatically.
+- Layout restoration waits briefly for a just-enabled display to appear in discovery instead of failing with "the set of displays changed".
+- 55 unit tests. Validated with mocks and read-only DDC reads on hardware; the enable retry and notifications from the keyboard shortcuts have not yet been observed on hardware.
+
 ### Fewer intermittent Shortcuts errors — 2026-11-10
 
 - Repeated a failed or malformed m1ddc request up to 3 times with 0.3-second pauses before failing a brightness command; timeouts are not repeated.

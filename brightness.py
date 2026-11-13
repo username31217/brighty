@@ -60,9 +60,20 @@ class Builtin:
 class External:
     def __init__(self, uid):
         self.uid = uid
-        self.maximum = self.command('max', 'luminance')
-        if self.maximum <= 0:
-            raise RuntimeError('DDC returned an invalid maximum brightness.')
+        self.maximum = self.read_maximum()
+
+    def read_maximum(self):
+        # The tested LG occasionally answers 8224 (0x2020, two ASCII spaces)
+        # instead of its real maximum. Accept only two equal consecutive reads.
+        values = []
+        for attempt in range(DDC_ATTEMPTS + 1):
+            if attempt:
+                time.sleep(DDC_RETRY_PAUSE)
+            value = self.command('max', 'luminance')
+            if value > 0 and values and values[-1] == value:
+                return value
+            values.append(value)
+        raise RuntimeError(f'DDC returned an inconsistent maximum brightness: {values}.')
 
     def command(self, *args):
         # Timeouts are not retried: each one already costs 8 seconds.
@@ -83,10 +94,16 @@ class External:
         raise RuntimeError(f'{error} ({DDC_ATTEMPTS} attempts)')
 
     def get(self):
-        raw = self.command('get', 'luminance')
-        if not 0 <= raw <= self.maximum:
-            raise RuntimeError('DDC returned an out-of-range brightness value.')
-        return raw / self.maximum
+        # Out-of-range answers are transient garbage (see read_maximum); re-read.
+        values = []
+        for attempt in range(DDC_ATTEMPTS):
+            if attempt:
+                time.sleep(DDC_RETRY_PAUSE)
+            raw = self.command('get', 'luminance')
+            if 0 <= raw <= self.maximum:
+                return raw / self.maximum
+            values.append(raw)
+        raise RuntimeError(f'DDC returned out-of-range brightness values {values} (maximum {self.maximum}).')
 
     def quantize(self, value):
         return int(value * self.maximum + 0.5) / self.maximum
@@ -208,8 +225,10 @@ def main():
     parser = argparse.ArgumentParser(description='Hardware display brightness: 50% ↔ 100%.')
     parser.add_argument('action', choices=['status', 'half', 'max', 'toggle', 'sync'])
     args = parser.parse_args()
+    from runlog import Report
     if args.action == 'sync':
-        return sync_external().strip()
+        text = sync_external().strip()
+        return Report(text, 'Brightness synchronized', text)
     # Nonblocking process lock: repeated hotkeys never queue extra toggles.
     with brightness_lock():
         devices, main_name = connect()
@@ -218,8 +237,12 @@ def main():
             return json.dumps({'main': main_name, 'brightness': current}, ensure_ascii=False)
         level = target_level(current[main_name]) if args.action == 'toggle' else {'half': 0.5, 'max': 1.0}[args.action]
         result = apply(devices, level)
-        return (f'Main display: {main_name}, previously {current[main_name]:.1%}. '
+        text = (f'Main display: {main_name}, previously {current[main_name]:.1%}. '
                 + ' '.join(f'{name}: {value:.1%}.' for name, value in result.items()))
+        body = ', '.join(f'{name} {value:.0%}' for name, value in result.items())
+        if 'LG' not in result:
+            body += ' (external display off)'
+        return Report(text, f'Brightness {level:.0%}', f'{body}. Was {current[main_name]:.0%} on {main_name}.')
 
 
 if __name__ == '__main__':

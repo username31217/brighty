@@ -145,6 +145,25 @@ class BrightnessTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'DDC down'):
                 sync_external('lg')
         self.assertEqual(devices.call_count, SYNC_ATTEMPTS)
+    def test_garbage_maximum_needs_two_equal_reads(self):
+        device = External.__new__(External)
+        with patch.object(device, 'command', side_effect=[8224, 100, 100]), patch('brightness.time.sleep'):
+            self.assertEqual(device.read_maximum(), 100)
+
+    def test_inconsistent_maximum_fails_before_changes(self):
+        device = External.__new__(External)
+        with patch.object(device, 'command', side_effect=[8224, 100, 8224, 100]), patch('brightness.time.sleep'):
+            with self.assertRaisesRegex(RuntimeError, 'inconsistent maximum'):
+                device.read_maximum()
+
+    def test_out_of_range_reading_is_reread(self):
+        device = External.__new__(External)
+        device.maximum = 100
+        with patch.object(device, 'command', side_effect=[8224, 50]), patch('brightness.time.sleep'):
+            self.assertEqual(device.get(), 0.5)
+        with patch.object(device, 'command', return_value=8224), patch('brightness.time.sleep'):
+            with self.assertRaisesRegex(RuntimeError, r'out-of-range brightness values \[8224'):
+                device.get()
 
 if __name__ == '__main__':
     unittest.main()

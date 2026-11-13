@@ -3,6 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock
+import brighty
 from brighty import Controller, displays
 from display_api import DisplayAPI
 
@@ -211,6 +212,56 @@ class SwitchTests(unittest.TestCase):
         api.cg.CGCancelDisplayConfiguration.assert_called_once()
         api.cg.CGCompleteDisplayConfiguration.assert_not_called()
 
+    def test_on_retries_enable_after_macos_failure(self):
+        self.control.act('off')
+        failures = [RuntimeError('macOS: applying configuration for display 3, code 1001.')]
+        original = self.change
+        def flaky(number, enabled):
+            if failures:
+                self.calls.append((number, enabled))
+                raise failures.pop()
+            original(number, enabled)
+        self.control.set_enabled = flaky
+        self.assertIn('active', self.control.act('on'))
+        self.assertEqual(self.calls[-2:], [(3, True), (3, True)])
+        self.assertEqual(self.control.event, 'on')
+
+    def test_on_gives_up_after_bounded_enable_attempts(self):
+        self.control.act('off')
+        def broken(number, enabled):
+            self.calls.append((number, enabled))
+            raise RuntimeError('code 1001')
+        self.control.set_enabled = broken
+        before = len(self.calls)
+        with self.assertRaisesRegex(RuntimeError, 'Enabling was not confirmed'):
+            self.control.act('on')
+        self.assertEqual(len(self.calls) - before, brighty.ENABLE_ATTEMPTS)
+
+    def test_off_is_never_repeated(self):
+        def broken(number, enabled):
+            self.calls.append((number, enabled))
+            raise RuntimeError('code 1001')
+        self.control.set_enabled = broken
+        with self.assertRaisesRegex(RuntimeError, 'Disconnection was not confirmed'):
+            self.control.act('off')
+        self.assertEqual(self.calls, [(3, False)])
+
+    def test_layout_waits_for_late_display_discovery(self):
+        self.control.act('off')
+        self.control.attempts = 3
+        reads = iter([[BUILTIN.copy()]])
+        original = self.control.read
+        self.control.read = lambda: next(reads, None) or original()
+        state = json.loads(self.path.read_text())
+        self.screens = [BUILTIN.copy(), LG.copy()]
+        self.assertIn('restored', self.control.restore_layout(state))
+
+    def test_notification_summaries(self):
+        on = brighty.notification('on', 'The external display is active in macOS. Display layout restored. '
+                                        'LG brightness synchronized with MacBook: 54.0%. Check the image on LG.')
+        self.assertEqual(on.title, 'External display on')
+        self.assertEqual(on.body, 'Layout restored. LG brightness set to 54.0% to match the MacBook.')
+        self.assertEqual(brighty.notification('off', 'x').title, 'External display off')
 
 if __name__ == '__main__':
     unittest.main()

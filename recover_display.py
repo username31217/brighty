@@ -5,6 +5,7 @@ import json
 import time
 from brighty import STATE, Controller, read_screens, sync_brightness_after_on
 from display_api import DisplayAPI
+from runlog import Report
 
 
 def record_recovery(saved, active):
@@ -57,7 +58,8 @@ def main():
             active = next((s for s in current if s['id'] == target and s['enabled']), None)
             if active:
                 restored = record_recovery(saved, active)
-                return 'LG is active in macOS again.' + restored + ' Check the image.'
+                text = 'LG is active in macOS again.' + restored + ' Check the image.'
+                return Report(text, 'External display recovered', text)
     raise RuntimeError('LG did not appear among active displays. ' + '; '.join(errors) + '\nSave your work and restart the Mac; no automatic restart will be performed.')
 
 
